@@ -1,6 +1,6 @@
 # VibeCoin Whitepaper
 
-**Version 1.0 | January 2025**
+**Version 1.1 | January 2025**
 
 ---
 
@@ -10,23 +10,25 @@
 2. [Introduction](#introduction)
 3. [The VibeCoding Movement](#the-vibecoding-movement)
 4. [Technical Architecture](#technical-architecture)
-5. [Proof of Vibe Consensus](#proof-of-vibe-consensus)
-6. [Token Economics](#token-economics)
-7. [Governance Model](#governance-model)
-8. [Use Cases & Applications](#use-cases--applications)
-9. [Security Considerations](#security-considerations)
-10. [Roadmap](#roadmap)
-11. [Conclusion](#conclusion)
+5. [Security Architecture](#security-architecture)
+6. [Proof of Work Implementation](#proof-of-work-implementation)
+7. [Token Economics](#token-economics)
+8. [Network Protocol](#network-protocol)
+9. [Governance Model](#governance-model)
+10. [Use Cases & Applications](#use-cases--applications)
+11. [Implementation Status](#implementation-status)
+12. [Roadmap](#roadmap)
+13. [Conclusion](#conclusion)
 
 ---
 
 ## Abstract
 
 **English:**
-VibeCoin (VIBE) is a next-generation cryptocurrency designed to power the VibeCoding ecosystem — a global community of developers who believe that coding should be an expression of creativity, intuition, and collaborative spirit. Unlike traditional cryptocurrencies focused solely on financial transactions, VibeCoin introduces the novel "Proof of Vibe" (PoV) consensus mechanism that rewards meaningful contributions to the developer community, creating a self-sustaining economy where value flows to creators, educators, and innovators.
+VibeCoin (VIBE) is a next-generation cryptocurrency designed to power the VibeCoding ecosystem — a global community of developers who believe that coding should be an expression of creativity, intuition, and collaborative spirit. Built entirely from scratch using modern TypeScript, VibeCoin implements a complete blockchain with Proof of Work consensus, ECDSA cryptographic signatures, peer-to-peer networking, and persistent storage. Unlike forks of existing blockchains, VibeCoin was designed from first principles to be educational, extensible, and community-driven.
 
 **Français:**
-VibeCoin (VIBE) est une cryptomonnaie de nouvelle génération conçue pour alimenter l'écosystème VibeCoding — une communauté mondiale de développeurs qui croient que le code devrait être une expression de créativité, d'intuition et d'esprit collaboratif. Contrairement aux cryptomonnaies traditionnelles focalisées uniquement sur les transactions financières, VibeCoin introduit le nouveau mécanisme de consensus "Proof of Vibe" (PoV) qui récompense les contributions significatives à la communauté des développeurs, créant une économie auto-soutenable où la valeur circule vers les créateurs, les éducateurs et les innovateurs.
+VibeCoin (VIBE) est une cryptomonnaie de nouvelle génération conçue pour alimenter l'écosystème VibeCoding — une communauté mondiale de développeurs qui croient que le code devrait être une expression de créativité, d'intuition et d'esprit collaboratif. Construit entièrement de zéro en TypeScript moderne, VibeCoin implémente une blockchain complète avec consensus Proof of Work, signatures cryptographiques ECDSA, réseau peer-to-peer et stockage persistant. Contrairement aux forks de blockchains existantes, VibeCoin a été conçu à partir des principes fondamentaux pour être éducatif, extensible et orienté communauté.
 
 ---
 
@@ -39,14 +41,14 @@ The current landscape of software development faces several challenges:
 1. **Undervalued Contributions**: Open-source developers often work for free while corporations profit from their code
 2. **Learning Barriers**: Quality education in programming remains expensive and inaccessible
 3. **Community Fragmentation**: Developers work in silos, missing collaborative opportunities
-4. **Burnout Culture**: The industry promotes overwork over sustainable, creative development
+4. **Blockchain Complexity**: Most blockchain codebases are too complex to learn from
 
 Le paysage actuel du développement logiciel fait face à plusieurs défis :
 
 1. **Contributions sous-évaluées** : Les développeurs open-source travaillent souvent gratuitement tandis que les entreprises profitent de leur code
 2. **Barrières à l'apprentissage** : L'éducation de qualité en programmation reste chère et inaccessible
 3. **Fragmentation communautaire** : Les développeurs travaillent en silos, manquant des opportunités de collaboration
-4. **Culture du burnout** : L'industrie promeut le surmenage plutôt que le développement créatif durable
+4. **Complexité Blockchain** : La plupart des codebases blockchain sont trop complexes pour apprendre
 
 ### Our Vision / Notre Vision
 
@@ -55,7 +57,7 @@ VibeCoin reimagines the relationship between developers and value creation. We e
 - Every meaningful code contribution is recognized and rewarded
 - Learning to code is incentivized, not penalized financially
 - Community mentorship becomes a valued economic activity
-- Creativity and intuition are celebrated, not just productivity metrics
+- The blockchain codebase itself is educational and accessible
 
 ---
 
@@ -88,7 +90,7 @@ VibeCoding emerged as a counter-cultural response to the industrialization of so
 
 ### The Manifesto / Le Manifeste
 
-> "We are VibeConders. We reject the factory model of software development.
+> "We are VibeCoders. We reject the factory model of software development.
 > We believe code is poetry, debugging is meditation, and shipping is celebration.
 > We build not for metrics, but for meaning. Not for velocity, but for value.
 > We are the vibe, and the vibe is us."
@@ -99,143 +101,260 @@ VibeCoding emerged as a counter-cultural response to the industrialization of so
 
 ### Overview / Vue d'Ensemble
 
-VibeCoin is built on a custom blockchain architecture optimized for:
+VibeCoin is built on a custom blockchain architecture implemented in TypeScript:
 
-- **Speed**: ~10 second block times
-- **Scalability**: Layer 2 solutions ready
-- **Sustainability**: Energy-efficient consensus
-- **Flexibility**: Smart contract support
+- **Language**: TypeScript (Node.js runtime)
+- **Block Time**: ~10 seconds target
+- **Hashing**: SHA-256 (same as Bitcoin)
+- **Signatures**: ECDSA with secp256k1 curve
+- **Storage**: LevelDB for persistence
+- **Network**: WebSocket-based P2P
 
-### Blockchain Layer
+### System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    VIBECOIN STACK                            │
-├─────────────────────────────────────────────────────────────┤
-│  Application Layer                                           │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐           │
-│  │ Wallet  │ │   DEX   │ │   DAO   │ │   NFT   │           │
-│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘           │
-│       └──────────┬┴──────────┬┴──────────┘                  │
-│                  ▼                                           │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Smart Contract Layer                    │    │
-│  │              (VibeScript Engine)                     │    │
-│  └───────────────────────┬─────────────────────────────┘    │
-│                          ▼                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Consensus Layer                         │    │
-│  │              (Proof of Vibe)                         │    │
-│  └───────────────────────┬─────────────────────────────┘    │
-│                          ▼                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Network Layer                           │    │
-│  │              (P2P / WebSocket)                       │    │
-│  └───────────────────────┬─────────────────────────────┘    │
-│                          ▼                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Data Layer                              │    │
-│  │              (LevelDB / IPFS)                        │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      VIBECOIN NODE                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
+│   │   REST API  │     │  P2P Server │     │    Miner    │       │
+│   │  (Express)  │     │ (WebSocket) │     │   (PoW)     │       │
+│   └──────┬──────┘     └──────┬──────┘     └──────┬──────┘       │
+│          │                   │                   │               │
+│          └───────────────────┼───────────────────┘               │
+│                              │                                   │
+│                     ┌────────▼────────┐                          │
+│                     │   BLOCKCHAIN    │                          │
+│                     │     CORE        │                          │
+│                     └────────┬────────┘                          │
+│                              │                                   │
+│          ┌───────────────────┼───────────────────┐               │
+│          │                   │                   │               │
+│   ┌──────▼──────┐     ┌──────▼──────┐     ┌──────▼──────┐       │
+│   │    Block    │     │ Transaction │     │   Wallet    │       │
+│   │   Manager   │     │    Pool     │     │   Manager   │       │
+│   └──────┬──────┘     └─────────────┘     └─────────────┘       │
+│          │                                                       │
+│   ┌──────▼──────┐                                               │
+│   │   LevelDB   │                                               │
+│   │   Storage   │                                               │
+│   └─────────────┘                                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Block Structure
 
-```javascript
+Each block in VibeCoin contains:
+
+```typescript
+interface Block {
+  index: number;           // Block height in the chain
+  timestamp: number;       // Unix timestamp (milliseconds)
+  previousHash: string;    // SHA-256 hash of previous block
+  hash: string;           // SHA-256 hash of this block
+  nonce: number;          // Proof of Work solution
+  transactions: Transaction[];
+}
+```
+
+**Example Block:**
+```json
 {
   "index": 1,
   "timestamp": 1704672000000,
-  "previousHash": "0x000...",
-  "hash": "0xabc...",
-  "nonce": 42069,
-  "difficulty": 4,
-  "vibeScore": 847,
-  "transactions": [...],
-  "validator": "0xdef...",
-  "vibeProof": {
-    "contributions": 12,
-    "mentoringSessions": 3,
-    "communityScore": 95
-  }
+  "previousHash": "00004a3b2c1d...",
+  "hash": "00007c03c990...",
+  "nonce": 87243,
+  "transactions": [
+    {
+      "id": "tx-abc123...",
+      "from": "COINBASE",
+      "to": "04fa6766...",
+      "amount": 50,
+      "timestamp": 1704672000000,
+      "signature": null
+    }
+  ]
+}
+```
+
+### Transaction Structure
+
+```typescript
+interface Transaction {
+  id: string;              // UUID v4
+  from: string;            // Sender's public key (or "COINBASE")
+  to: string;              // Recipient's public key
+  amount: number;          // Amount in VIBE
+  fee: number;             // Transaction fee
+  timestamp: number;       // Creation time
+  signature: string | null; // ECDSA signature
+  memo?: string;           // Optional message
 }
 ```
 
 ### Cryptographic Foundations
 
-- **Hashing**: SHA-256 for block hashes, Keccak-256 for addresses
-- **Signatures**: ECDSA with secp256k1 curve
-- **Key Derivation**: BIP-39 / BIP-44 compatible
+| Component | Algorithm | Standard |
+|-----------|-----------|----------|
+| Block Hashing | SHA-256 | FIPS 180-4 |
+| Transaction Signing | ECDSA | ANSI X9.62 |
+| Elliptic Curve | secp256k1 | SEC 2 |
+| Key Derivation | Random 256-bit | CSPRNG |
+
+**Signature Process:**
+```
+1. Create transaction data object
+2. Hash with SHA-256: h = SHA256(JSON.stringify(txData))
+3. Sign with private key: sig = ECDSA.sign(h, privateKey)
+4. Verify with public key: valid = ECDSA.verify(h, sig, publicKey)
+```
 
 ---
 
-## Proof of Vibe Consensus
+## Security Architecture
 
-### The Innovation / L'Innovation
+### Why is a Blockchain Secure?
 
-Proof of Vibe (PoV) is our novel consensus mechanism that combines:
+The security of VibeCoin (and any blockchain) comes from three pillars:
 
-1. **Proof of Stake (PoS)**: Economic security through staked VIBE
-2. **Proof of Contribution**: Measurable community contributions
-3. **Reputation Score**: Historical track record of positive vibes
-
-### Vibe Score Calculation
+#### 1. Decentralization / Décentralisation
 
 ```
-VibeScore = (StakeWeight × 0.3) + (ContributionScore × 0.4) + (ReputationScore × 0.3)
+    ❌ Traditional Architecture        ✅ Blockchain Architecture
+
+         [Central Server]                [Node A]───[Node B]
+              │                              │    ╲    │
+       ┌──────┼──────┐                       │     ╲   │
+       │      │      │                   [Node C]───[Node D]
+    [User] [User] [User]                     │         │
+                                         [Node E]───[Node F]
+
+    Single point of failure           Each node has complete copy
+    = Corruptible                     = Practically impossible to corrupt
+```
+
+**Key Insight**: There is no central server. Every node maintains a complete copy of the blockchain. To corrupt the data, an attacker would need to simultaneously compromise a majority of all nodes worldwide.
+
+#### 2. Cryptographic Chaining / Chaînage Cryptographique
+
+Each block contains the hash of the previous block, creating an immutable chain:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Block 0   │     │   Block 1   │     │   Block 2   │
+│  (Genesis)  │◄────│             │◄────│             │
+│             │     │             │     │             │
+│ Hash: 0000a │     │ Hash: 0000b │     │ Hash: 0000c │
+│ Prev: null  │     │ Prev: 0000a │     │ Prev: 0000b │
+└─────────────┘     └─────────────┘     └─────────────┘
+
+To modify Block 1, you must:
+1. Recalculate Block 1's hash (expensive - PoW)
+2. Recalculate Block 2's hash (expensive - PoW)
+3. Recalculate ALL subsequent blocks
+4. Do this faster than the entire network combined
+```
+
+**Cost of Attack**: Modifying a block that is N blocks deep requires recalculating N blocks of Proof of Work. With current difficulty, this would take enormous computational resources.
+
+#### 3. Proof of Work / Preuve de Travail
+
+Mining requires finding a nonce such that:
+```
+SHA256(block_data + nonce) starts with N zeros
+```
+
+With difficulty 4:
+- Valid: `0000a8f9a9d73...`
+- Invalid: `0001b7c3e2f8...`
+
+**Statistical Security**: Finding a valid nonce requires ~65,536 attempts on average (16^4). This makes:
+- Block creation: Computationally expensive
+- Block verification: Instant (one hash)
+- Tampering: Requires redoing all work
+
+### Digital Signatures / Signatures Numériques
+
+Every transaction must be signed by the sender's private key:
+
+```typescript
+// Only the private key holder can create this signature
+const signature = sign(privateKey, transactionData);
+
+// Anyone can verify with the public key
+const isValid = verify(publicKey, signature, transactionData);
+```
+
+**Security Properties:**
+- **Authentication**: Proves the transaction came from the key owner
+- **Integrity**: Any modification invalidates the signature
+- **Non-repudiation**: Signer cannot deny having signed
+
+### Attack Vectors and Mitigations
+
+| Attack | Description | VibeCoin Mitigation |
+|--------|-------------|---------------------|
+| 51% Attack | Control majority of mining power | Network growth, decentralization |
+| Double Spend | Spend same coins twice | Confirmation depth (6+ blocks) |
+| Sybil Attack | Fake multiple identities | PoW makes identity creation costly |
+| Eclipse Attack | Isolate node from network | Peer diversity, multiple connections |
+| Replay Attack | Reuse valid transaction | Unique transaction IDs |
+
+### Current Security Status
+
+| Aspect | Testnet Status | Production Requirement |
+|--------|---------------|------------------------|
+| Nodes | 1 (local) | 100+ independent |
+| Network | localhost | Global Internet |
+| Miners | Single | Distributed community |
+| Value | 0€ (test) | Real economic value |
+| Audits | None | Professional security audit |
+
+---
+
+## Proof of Work Implementation
+
+### Mining Algorithm
+
+VibeCoin uses a standard SHA-256 Proof of Work:
+
+```typescript
+mine(difficulty: number): void {
+  const target = '0'.repeat(difficulty);
+
+  while (!this.hash.startsWith(target)) {
+    this.nonce++;
+    this.hash = this.calculateHash();
+  }
+}
+```
+
+### Difficulty Adjustment
+
+Current implementation uses fixed difficulty. Future versions will implement dynamic adjustment:
+
+```
+New Difficulty = Current Difficulty × (Actual Time / Target Time)
 
 Where:
-- StakeWeight = log(StakedVIBE + 1) / log(TotalStaked + 1)
-- ContributionScore = Σ(Contribution × Weight) / TimeWindow
-- ReputationScore = HistoricalVibes × DecayFactor
+- Target Time = 10 seconds per block
+- Adjustment Period = Every 100 blocks
+- Max Adjustment = ±25% per period
 ```
 
-### Contribution Weights
+### Block Rewards
 
-| Activity Type | Weight | Verification Method |
-|--------------|--------|---------------------|
-| Merged PR to approved repo | 100 | GitHub API |
-| Educational content created | 75 | Community validation |
-| Mentoring session completed | 60 | Peer attestation |
-| Bug report accepted | 40 | Project maintainer |
-| Community help (answered questions) | 20 | Upvotes/acceptance |
-| Event participation | 10 | Attendance proof |
+| Block Range | Reward | Era |
+|-------------|--------|-----|
+| 0 - 210,000 | 50 VIBE | Era 1 |
+| 210,001 - 420,000 | 25 VIBE | Era 2 |
+| 420,001 - 630,000 | 12.5 VIBE | Era 3 |
+| ... | ... | ... |
 
-### Validator Selection
-
-```
-                    ┌─────────────────┐
-                    │  Epoch Start    │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ Calculate Vibe  │
-                    │ Scores for all  │
-                    │   validators    │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ Weighted Random │
-                    │   Selection     │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              ▼              ▼              ▼
-        ┌──────────┐  ┌──────────┐  ┌──────────┐
-        │Validator │  │Validator │  │Validator │
-        │    A     │  │    B     │  │    C     │
-        └──────────┘  └──────────┘  └──────────┘
-```
-
-### Anti-Gaming Measures
-
-To prevent manipulation of the Vibe Score:
-
-1. **Sybil Resistance**: Identity verification through Web3 identity providers
-2. **Contribution Quality**: AI-assisted review for spam detection
-3. **Reputation Decay**: Old contributions contribute less over time
-4. **Peer Review**: Community validation for subjective contributions
-5. **Slash Conditions**: Penalties for proven gaming attempts
+Halving occurs every 210,000 blocks (~4 years at 10s blocks).
 
 ---
 
@@ -243,27 +362,25 @@ To prevent manipulation of the Vibe Score:
 
 ### Supply Distribution
 
-| Allocation | Amount | Percentage | Vesting |
-|------------|--------|------------|---------|
-| Community Rewards | 12,600,000 VIBE | 60% | Linear over 10 years |
-| Team & Founders | 3,150,000 VIBE | 15% | 1 year cliff, 3 year vest |
-| Development Fund | 3,150,000 VIBE | 15% | As needed for development |
-| Emergency Reserve | 2,100,000 VIBE | 10% | DAO controlled |
+| Allocation | Amount | Percentage | Status |
+|------------|--------|------------|--------|
+| Mining Rewards | 12,600,000 VIBE | 60% | In progress |
+| Team & Founders | 3,150,000 VIBE | 15% | Locked |
+| Development Fund | 3,150,000 VIBE | 15% | Controlled |
+| Community Reserve | 2,100,000 VIBE | 10% | DAO |
 | **Total** | **21,000,000 VIBE** | **100%** | - |
 
-### Emission Schedule
+### Key Parameters
 
-```
-Year 1:  ████████████████████  2,520,000 VIBE (20% of community allocation)
-Year 2:  ████████████████      2,016,000 VIBE (16%)
-Year 3:  ██████████████        1,764,000 VIBE (14%)
-Year 4:  ████████████          1,512,000 VIBE (12%)
-Year 5:  ██████████            1,260,000 VIBE (10%)
-Year 6:  ████████              1,008,000 VIBE (8%)
-Year 7:  ██████                  756,000 VIBE (6%)
-Year 8:  █████                   630,000 VIBE (5%)
-Year 9:  ████                    504,000 VIBE (4%)
-Year 10: ████                    630,000 VIBE (5%)
+```typescript
+const BLOCKCHAIN_CONFIG = {
+  TOTAL_SUPPLY: 21_000_000,      // Maximum supply
+  INITIAL_REWARD: 50,            // Initial block reward
+  HALVING_INTERVAL: 210_000,     // Blocks between halvings
+  BLOCK_TIME: 10_000,            // Target: 10 seconds
+  INITIAL_DIFFICULTY: 4,         // Starting difficulty
+  MIN_FEE: 0.0001                // Minimum transaction fee
+};
 ```
 
 ### Fee Structure
@@ -271,21 +388,73 @@ Year 10: ████                    630,000 VIBE (5%)
 | Transaction Type | Fee |
 |-----------------|-----|
 | Standard Transfer | 0.001 VIBE |
-| Smart Contract Call | 0.01 VIBE + Gas |
-| NFT Mint | 0.1 VIBE |
-| DAO Proposal | 10 VIBE (refunded if passed) |
+| Large Transfer (>1000 VIBE) | 0.01 VIBE |
+| Faucet Request | Free |
 
-### Deflationary Mechanisms
+---
 
-1. **Burn on Transfer**: 0.1% of each transaction is burned
-2. **Failed Proposal Burn**: Rejected DAO proposals burn the deposit
-3. **Slash Burns**: Penalties from validators are burned
+## Network Protocol
+
+### P2P Communication
+
+VibeCoin uses WebSocket for peer-to-peer communication:
+
+```typescript
+interface P2PMessage {
+  type: MessageType;
+  data: any;
+  timestamp: number;
+  nodeId: string;
+}
+
+enum MessageType {
+  HANDSHAKE = 'HANDSHAKE',
+  NEW_BLOCK = 'NEW_BLOCK',
+  NEW_TRANSACTION = 'NEW_TRANSACTION',
+  REQUEST_CHAIN = 'REQUEST_CHAIN',
+  CHAIN_RESPONSE = 'CHAIN_RESPONSE',
+  PEERS_REQUEST = 'PEERS_REQUEST',
+  PEERS_RESPONSE = 'PEERS_RESPONSE'
+}
+```
+
+### Chain Synchronization
+
+```
+Node A (new)              Node B (existing)
+    │                           │
+    │──── HANDSHAKE ──────────►│
+    │◄─── HANDSHAKE ───────────│
+    │                           │
+    │──── REQUEST_CHAIN ──────►│
+    │◄─── CHAIN_RESPONSE ──────│
+    │                           │
+    │     [Validates chain]     │
+    │     [Replaces if longer]  │
+    │                           │
+```
+
+### REST API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/info` | Node information |
+| GET | `/stats` | Blockchain statistics |
+| GET | `/blocks` | List all blocks |
+| GET | `/blocks/:index` | Get block by index |
+| GET | `/blocks/latest` | Get latest block |
+| GET | `/transactions/pending` | Pending transactions |
+| POST | `/transactions` | Create transaction |
+| GET | `/address/:addr/balance` | Get address balance |
+| POST | `/mine` | Trigger mining |
+| POST | `/wallet/new` | Generate new wallet |
+| POST | `/faucet` | Get testnet VIBE |
 
 ---
 
 ## Governance Model
 
-### DAO Structure
+### DAO Structure (Planned)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -308,30 +477,15 @@ Year 10: ████                    630,000 VIBE (5%)
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Voting Power
-
-Voting power is determined by:
+### Voting Power Formula
 
 ```
 VotingPower = sqrt(StakedVIBE) × (1 + VibeMultiplier)
 
-Where VibeMultiplier = min(VibeScore / 1000, 0.5)
+Where:
+- VibeMultiplier = min(ContributionScore / 1000, 0.5)
+- Maximum boost from contributions: 50%
 ```
-
-This ensures that:
-- Large holders have influence but not dominance (square root dampening)
-- Active contributors get bonus voting power (up to 50% boost)
-- Long-term commitment is rewarded over short-term speculation
-
-### Proposal Types
-
-| Type | Quorum | Approval | Timelock |
-|------|--------|----------|----------|
-| Parameter Change | 10% | 60% | 48 hours |
-| Treasury Spend (< 100k VIBE) | 15% | 60% | 72 hours |
-| Treasury Spend (> 100k VIBE) | 25% | 70% | 7 days |
-| Protocol Upgrade | 30% | 75% | 14 days |
-| Emergency Action | 40% | 80% | 0 (immediate) |
 
 ---
 
@@ -339,124 +493,141 @@ This ensures that:
 
 ### 1. Creator Rewards Platform
 
-**Problem**: Open-source developers don't get paid
-**Solution**: Direct tipping and recurring sponsorships in VIBE
-
 ```javascript
-// Example: Tip a developer for helpful code
-await vibe.tip({
-  recipient: "developer.vibe",
+// Tip a developer for helpful code
+await vibe.send({
+  to: "developer_address",
   amount: 10,
-  message: "Thanks for the amazing library!",
-  linkedPR: "github.com/org/repo/pull/123"
+  memo: "Thanks for the amazing library!"
 });
 ```
 
-### 2. Learn-to-Earn Academy
+### 2. Learn-to-Earn Academy (Planned)
 
-**Problem**: Coding education is expensive
-**Solution**: Earn VIBE by completing learning paths
+| Course Level | VIBE Reward | Skills |
+|--------------|-------------|--------|
+| Beginner | 50 VIBE | Blockchain basics |
+| Intermediate | 150 VIBE | Smart contracts |
+| Advanced | 500 VIBE | Protocol development |
 
-| Course Level | VIBE Reward | Skills Gained |
-|--------------|-------------|---------------|
-| Beginner | 50 VIBE | HTML, CSS, JS basics |
-| Intermediate | 150 VIBE | Frameworks, APIs |
-| Advanced | 500 VIBE | Blockchain, Smart Contracts |
-| Expert | 1000 VIBE | Protocol development |
+### 3. Testnet Faucet
 
-### 3. Mentorship Marketplace
-
-**Problem**: Finding good mentors is hard
-**Solution**: Stake-backed mentorship with reputation
-
+Currently operational for testing:
+```bash
+curl -X POST http://localhost:3000/faucet \
+  -H "Content-Type: application/json" \
+  -d '{"address": "your_public_key"}'
 ```
-Mentor stakes VIBE → Session completed → Both parties rate
-                                           ↓
-                   Positive? → Stake returned + Bonus
-                   Negative? → Partial slash + Review
-```
-
-### 4. Code NFT Gallery
-
-Transform exceptional code into collectible art:
-
-- **Algorithm NFTs**: Unique implementations as digital collectibles
-- **Commit History NFTs**: Milestone commits immortalized on-chain
-- **Achievement Badges**: Gamified developer accomplishments
-
-### 5. Hackathon Treasury
-
-Decentralized hackathon funding:
-
-1. Community proposes hackathon theme
-2. DAO votes on budget allocation
-3. Prizes distributed automatically via smart contract
-4. Winning projects receive ongoing support
 
 ---
 
-## Security Considerations
+## Implementation Status
 
-### Smart Contract Security
+### Completed (v0.1.0)
 
-- All contracts audited before mainnet
-- Bug bounty program with up to 100,000 VIBE rewards
-- Formal verification for critical contracts
-- Upgradeable contracts with timelock
+- [x] **Core Blockchain**
+  - Block structure with SHA-256 hashing
+  - Transaction model with ECDSA signatures
+  - Chain validation and integrity checks
+  - Genesis block generation
 
-### Network Security
+- [x] **Wallet System**
+  - Key pair generation (secp256k1)
+  - Transaction signing and verification
+  - Balance calculation
+  - Import/Export functionality
 
-- Minimum stake requirement for validators: 10,000 VIBE
-- Slashing for double-signing: 10% of stake
-- Slashing for downtime: 1% per hour (max 5%)
-- Eclipse attack prevention through peer diversity requirements
+- [x] **Mining**
+  - Proof of Work implementation
+  - Configurable difficulty
+  - Block reward system
+  - Coinbase transactions
 
-### Key Management
+- [x] **Storage**
+  - LevelDB persistence
+  - Blockchain state saving/loading
+  - Transaction indexing
+  - Wallet storage
 
-- BIP-39 seed phrases (12-24 words)
-- Hardware wallet support (Ledger, Trezor)
-- Multi-signature wallets for high-value accounts
-- Social recovery options
+- [x] **Network**
+  - P2P WebSocket server
+  - Peer discovery
+  - Block propagation
+  - Chain synchronization
+
+- [x] **API**
+  - REST endpoints
+  - Testnet faucet
+  - CORS support
+
+- [x] **CLI**
+  - Node startup
+  - Mining configuration
+  - Network selection
+
+### In Progress
+
+- [ ] Difficulty adjustment algorithm
+- [ ] Transaction mempool optimization
+- [ ] Peer reputation system
+
+### Planned
+
+- [ ] Smart contract engine
+- [ ] Web wallet interface
+- [ ] Mobile applications
+- [ ] Hardware wallet support
+- [ ] Cross-chain bridges
 
 ---
 
 ## Roadmap
 
-### 2025 Q1: Foundation
+### 2025 Q1: Foundation ✅
 - [x] Whitepaper v1.0
-- [x] Core team assembly
-- [ ] Testnet alpha launch
-- [ ] Initial wallet release
+- [x] Core blockchain implementation
+- [x] Testnet alpha launch
+- [x] CLI wallet and node
+- [x] REST API
+- [x] P2P networking
+- [x] GitHub repository public
 
-### 2025 Q2: Development
-- [ ] Smart contract engine
-- [ ] PoV consensus implementation
-- [ ] Testnet beta (public)
-- [ ] Security audits begin
+### 2025 Q2: Enhancement
+- [ ] Difficulty adjustment
+- [ ] Improved peer discovery
+- [ ] Block explorer web app
+- [ ] Security audit (basic)
+- [ ] Documentation expansion
 
 ### 2025 Q3: Ecosystem
-- [ ] Mainnet launch
+- [ ] Smart contract engine (VibeScript)
 - [ ] DEX integration
-- [ ] Creator rewards platform beta
-- [ ] Governance activation
+- [ ] Web wallet
+- [ ] Multi-node testnet deployment
 
 ### 2025 Q4: Growth
-- [ ] Mobile wallets
-- [ ] Learn-to-earn platform
-- [ ] Major exchange listings
-- [ ] Partnership announcements
+- [ ] Mobile wallets (iOS/Android)
+- [ ] Mainnet preparation
+- [ ] Professional security audit
+- [ ] Partnership development
 
-### 2026+: Expansion
+### 2026: Mainnet
+- [ ] Mainnet launch
+- [ ] Exchange listings
+- [ ] DAO activation
 - [ ] Cross-chain bridges
-- [ ] Layer 2 scaling
-- [ ] Enterprise solutions
-- [ ] Global developer community hubs
 
 ---
 
 ## Conclusion
 
-VibeCoin represents more than a cryptocurrency — it's a movement to realign incentives in the software development ecosystem. By rewarding contribution over capital, community over competition, and creativity over conformity, we aim to build a more sustainable and joyful future for developers worldwide.
+VibeCoin represents more than a cryptocurrency — it's an educational platform, a community experiment, and a movement to make blockchain technology accessible. Built from first principles in modern TypeScript, every line of code is designed to be readable, maintainable, and instructive.
+
+**What makes VibeCoin different:**
+- 100% original code (not a fork)
+- Educational by design
+- Community-driven development
+- Transparent and open source
 
 The vibe is calling. Will you answer?
 
@@ -466,14 +637,32 @@ The vibe is calling. Will you answer?
 
 1. Nakamoto, S. (2008). Bitcoin: A Peer-to-Peer Electronic Cash System
 2. Buterin, V. (2014). Ethereum: A Next-Generation Smart Contract Platform
-3. Raymond, E. (1999). The Cathedral and the Bazaar
-4. Levy, S. (1984). Hackers: Heroes of the Computer Revolution
+3. Antonopoulos, A. (2017). Mastering Bitcoin
+4. Raymond, E. (1999). The Cathedral and the Bazaar
+
+---
+
+## Technical Specifications Summary
+
+| Parameter | Value |
+|-----------|-------|
+| Algorithm | SHA-256 + ECDSA |
+| Curve | secp256k1 |
+| Block Time | 10 seconds |
+| Initial Difficulty | 4 |
+| Block Reward | 50 VIBE |
+| Halving Interval | 210,000 blocks |
+| Total Supply | 21,000,000 VIBE |
+| Transaction Fee | 0.001 VIBE |
+| API Port | 3000 |
+| P2P Port | 6001 |
+| Storage | LevelDB |
 
 ---
 
 ## Legal Disclaimer
 
-This whitepaper is for informational purposes only and does not constitute financial, legal, or investment advice. VibeCoin (VIBE) tokens may be considered securities in certain jurisdictions. Always consult with qualified professionals before participating in any cryptocurrency project.
+This whitepaper is for informational purposes only and does not constitute financial, legal, or investment advice. VibeCoin (VIBE) is currently a testnet project for educational purposes. Always consult with qualified professionals before participating in any cryptocurrency project.
 
 ---
 
@@ -481,7 +670,9 @@ This whitepaper is for informational purposes only and does not constitute finan
 
 **VibeCoin — Code with Vibes**
 
-*Document Version: 1.0*
+*Document Version: 1.1*
 *Last Updated: January 2025*
+
+[GitHub](https://github.com/IOSBLKSTUDIO/VibeCoin) | [Demo](https://iosblkstudio.github.io/VibeCoin/)
 
 </div>

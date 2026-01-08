@@ -87,7 +87,7 @@ export class Storage {
       const heightStr = await this.db.get('meta:height');
       const height = parseInt(heightStr);
 
-      if (height === 0) {
+      if (isNaN(height) || height === 0) {
         return null;
       }
 
@@ -102,20 +102,32 @@ export class Storage {
         }
       }
 
-      // Load metadata
-      blockchain.difficulty = parseInt(await this.db.get('meta:difficulty'));
-      blockchain.miningReward = parseFloat(await this.db.get('meta:miningReward'));
-
-      // Load pending transactions
-      const pendingCount = parseInt(await this.db.get('pending:count'));
-      blockchain.pendingTransactions = [];
-
-      for (let i = 0; i < pendingCount; i++) {
-        const txData = JSON.parse(await this.db.get(`pending:${i}`));
-        blockchain.pendingTransactions.push(Transaction.fromJSON(txData));
+      // Verify we loaded at least one block
+      if (blockchain.chain.length === 0) {
+        return null;
       }
 
-      console.log(`📂 Blockchain loaded (${height} blocks)`);
+      // Load metadata
+      const diffStr = await this.db.get('meta:difficulty');
+      const rewardStr = await this.db.get('meta:miningReward');
+      blockchain.difficulty = parseInt(diffStr) || 4;
+      blockchain.miningReward = parseFloat(rewardStr) || 50;
+
+      // Load pending transactions
+      blockchain.pendingTransactions = [];
+      try {
+        const pendingCountStr = await this.db.get('pending:count');
+        const pendingCount = parseInt(pendingCountStr) || 0;
+
+        for (let i = 0; i < pendingCount; i++) {
+          const txData = JSON.parse(await this.db.get(`pending:${i}`));
+          blockchain.pendingTransactions.push(Transaction.fromJSON(txData));
+        }
+      } catch {
+        // No pending transactions
+      }
+
+      console.log(`📂 Blockchain loaded (${blockchain.chain.length} blocks)`);
       return blockchain;
     } catch (error) {
       console.log('📂 No existing blockchain found, starting fresh');
