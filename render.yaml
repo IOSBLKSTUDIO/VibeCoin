@@ -1,0 +1,17 @@
+# Render.com Blueprint for VibeCoin Testnet
+# Deploy: Connect your GitHub repo to Render and it will auto-deploy
+
+services:
+  - type: web
+    name: vibecoin-testnet
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /info
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    autoDeploy: true

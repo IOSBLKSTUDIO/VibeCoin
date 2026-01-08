@@ -1,20 +1,226 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { api, WalletData, Balance, NodeInfo, Block, Transaction } from './api';
+import { API_URL, TOKEN, FAUCET } from './config';
 import './App.css';
 
-type View = 'home' | 'whitepaper' | 'roadmap' | 'wallet-preview';
+type View = 'home' | 'wallet' | 'faucet' | 'send' | 'explorer' | 'whitepaper';
+
+// Storage keys
+const STORAGE_KEY = 'vibecoin_wallet';
+const FAUCET_KEY = 'vibecoin_faucet_time';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
+  const [wallet, setWallet] = useState<WalletData | null>(null);
+  const [balance, setBalance] = useState<Balance | null>(null);
+  const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [isOnline, setIsOnline] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
+  // Form states
+  const [sendTo, setSendTo] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [importKey, setImportKey] = useState('');
+  const [faucetCooldown, setFaucetCooldown] = useState<number>(0);
+
+  // Load wallet from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        setWallet(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load wallet:', e);
+      }
+    }
+  }, []);
+
+  // Check faucet cooldown
+  useEffect(() => {
+    const checkCooldown = () => {
+      const lastClaim = localStorage.getItem(FAUCET_KEY);
+      if (lastClaim) {
+        const elapsed = Date.now() - parseInt(lastClaim);
+        const remaining = FAUCET.cooldownMinutes * 60 * 1000 - elapsed;
+        setFaucetCooldown(remaining > 0 ? Math.ceil(remaining / 60000) : 0);
+      }
+    };
+    checkCooldown();
+    const interval = setInterval(checkCooldown, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check if node is online
+  const checkNode = useCallback(async () => {
+    try {
+      const online = await api.isOnline();
+      setIsOnline(online);
+      if (online) {
+        const info = await api.getInfo();
+        setNodeInfo(info);
+      }
+    } catch {
+      setIsOnline(false);
+    }
+  }, []);
+
+  // Refresh balance
+  const refreshBalance = useCallback(async () => {
+    if (!wallet || !isOnline) return;
+    try {
+      const bal = await api.getBalance(wallet.publicKey);
+      setBalance(bal);
+    } catch (e) {
+      console.error('Failed to get balance:', e);
+    }
+  }, [wallet, isOnline]);
+
+  // Check node on mount
+  useEffect(() => {
+    checkNode();
+    const interval = setInterval(checkNode, 30000);
+    return () => clearInterval(interval);
+  }, [checkNode]);
+
+  // Refresh balance when wallet changes
+  useEffect(() => {
+    refreshBalance();
+  }, [refreshBalance]);
+
+  // Save wallet to localStorage
+  const saveWallet = (w: WalletData | null) => {
+    if (w) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(w));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    setWallet(w);
+  };
+
+  // Create new wallet
+  const createWallet = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const newWallet = await api.createWallet();
+      saveWallet(newWallet);
+      setSuccess('Wallet created! Save your private key securely.');
+      setCurrentView('wallet');
+    } catch (e: any) {
+      setError(e.message || 'Failed to create wallet');
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Import wallet
+  const handleImportWallet = async () => {
+    if (!importKey) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const imported = await api.importWallet(importKey);
+      saveWallet({ ...imported, privateKey: importKey });
+      setSuccess('Wallet imported successfully!');
+      setImportKey('');
+      setCurrentView('wallet');
+    } catch (e: any) {
+      setError(e.message || 'Invalid private key');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Disconnect wallet
+  const disconnectWallet = () => {
+    saveWallet(null);
+    setBalance(null);
+    setSuccess('Wallet disconnected');
+    setCurrentView('home');
+  };
+
+  // Claim faucet
+  const claimFaucet = async () => {
+    if (!wallet || faucetCooldown > 0) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.claimFaucet(wallet.publicKey);
+      if (result.success) {
+        localStorage.setItem(FAUCET_KEY, Date.now().toString());
+        setFaucetCooldown(FAUCET.cooldownMinutes);
+        setSuccess(`Claimed ${FAUCET.amount} ${TOKEN.symbol}! Mining next block...`);
+        // Mine a block to confirm the transaction
+        await api.mine(wallet.publicKey);
+        await refreshBalance();
+        setSuccess(`${FAUCET.amount} ${TOKEN.symbol} added to your wallet!`);
+      }
+    } catch (e: any) {
+      setError(e.message || 'Failed to claim faucet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send transaction
+  const handleSend = async () => {
+    if (!wallet?.privateKey || !sendTo || !sendAmount) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const amount = parseFloat(sendAmount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Invalid amount');
+      }
+      const result = await api.sendTransaction(
+        wallet.privateKey,
+        wallet.publicKey,
+        sendTo,
+        amount,
+        'VibeCoin transfer'
+      );
+      if (result.success) {
+        setSuccess(`Sent ${amount} ${TOKEN.symbol}!`);
+        setSendTo('');
+        setSendAmount('');
+        await refreshBalance();
+        setCurrentView('wallet');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Transaction failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load blocks for explorer
+  const loadBlocks = async () => {
+    try {
+      const result = await api.getBlocks(20);
+      setBlocks(result.blocks.reverse());
+    } catch (e) {
+      console.error('Failed to load blocks:', e);
+    }
+  };
+
+  // Clear messages after delay
+  useEffect(() => {
+    if (error || success) {
+      const timer = setTimeout(() => {
+        setError(null);
+        setSuccess(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, success]);
+
+  // Short address helper
+  const shortAddr = (addr: string) => `${addr.slice(0, 8)}...${addr.slice(-8)}`;
+
+  // ==================== RENDER FUNCTIONS ====================
 
   const renderHome = () => (
     <>
@@ -26,9 +232,9 @@ function App() {
         </div>
 
         <div className="hero-content">
-          <div className="hero-badge">
+          <div className={`hero-badge ${isOnline ? 'online' : 'offline'}`}>
             <span className="badge-dot"></span>
-            Testnet Coming Soon
+            {isOnline ? 'Testnet Live' : 'Connecting...'}
           </div>
 
           <h1 className="hero-title">
@@ -39,22 +245,22 @@ function App() {
 
           <p className="hero-description">
             VibeCoin is the first cryptocurrency born from the <strong>VibeCoding</strong> movement.
-            A revolutionary digital asset where creativity, community, and code converge.
+            Join the testnet and start earning VIBE tokens today.
           </p>
 
           <div className="hero-actions">
-            <button className="btn btn-primary btn-lg" onClick={() => setCurrentView('whitepaper')}>
-              <span>Read Whitepaper</span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
+            {!wallet ? (
+              <button className="btn btn-primary btn-lg" onClick={createWallet} disabled={loading || !isOnline}>
+                {loading ? 'Creating...' : 'Create Wallet'}
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-lg" onClick={() => setCurrentView('wallet')}>
+                Open Wallet
+              </button>
+            )}
+            <button className="btn btn-secondary btn-lg" onClick={() => { setCurrentView('explorer'); loadBlocks(); }}>
+              Explore Blockchain
             </button>
-            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-              </svg>
-              <span>View on GitHub</span>
-            </a>
           </div>
         </div>
 
@@ -72,41 +278,27 @@ function App() {
         </div>
       </section>
 
-      {/* Testnet Status Section */}
+      {/* Network Status */}
       <section className="status-section">
         <div className="container">
           <div className="status-card">
             <div className="status-header">
-              <h2>Testnet Status</h2>
-              <span className="status-badge preparing">Preparing Launch</span>
+              <h2>Network Status</h2>
+              <span className={`status-badge ${isOnline ? 'live' : 'offline'}`}>
+                {isOnline ? 'Live' : 'Offline'}
+              </span>
             </div>
 
             <div className="status-grid">
               <div className="status-item">
                 <div className="status-icon">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M3 9h18"/>
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
                   </svg>
                 </div>
                 <div className="status-info">
                   <span className="status-label">Blocks</span>
-                  <span className="status-value coming-soon">--</span>
-                </div>
-              </div>
-
-              <div className="status-item">
-                <div className="status-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
-                </div>
-                <div className="status-info">
-                  <span className="status-label">Validators</span>
-                  <span className="status-value coming-soon">--</span>
+                  <span className="status-value">{nodeInfo?.blocks || '--'}</span>
                 </div>
               </div>
 
@@ -117,8 +309,20 @@ function App() {
                   </svg>
                 </div>
                 <div className="status-info">
-                  <span className="status-label">Total Staked</span>
-                  <span className="status-value coming-soon">--</span>
+                  <span className="status-label">Circulating</span>
+                  <span className="status-value">{nodeInfo?.circulatingSupply?.toFixed(0) || '--'}</span>
+                </div>
+              </div>
+
+              <div className="status-item">
+                <div className="status-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path d="M9 12l2 2 4-4"/>
+                  </svg>
+                </div>
+                <div className="status-info">
+                  <span className="status-label">Transactions</span>
+                  <span className="status-value">{nodeInfo?.transactions || '--'}</span>
                 </div>
               </div>
 
@@ -134,251 +338,49 @@ function App() {
                 </div>
               </div>
             </div>
-
-            <p className="status-note">
-              The VibeCoin testnet is currently in development. Join the waitlist to be notified when we launch.
-            </p>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="features-section">
+      {/* Quick Actions */}
+      <section className="actions-section">
         <div className="container">
           <div className="section-header">
-            <h2>Built Different</h2>
-            <p>VibeCoin reimagines what a cryptocurrency can be</p>
+            <h2>Quick Actions</h2>
+            <p>Get started with VibeCoin testnet</p>
           </div>
 
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🎯</span>
+          <div className="actions-grid">
+            <div className="action-card" onClick={() => wallet ? setCurrentView('wallet') : createWallet()}>
+              <div className="action-icon">
+                <span>👛</span>
               </div>
-              <h3>Proof of Vibe</h3>
-              <p>
-                Our unique consensus mechanism rewards creators, not just capital.
-                Stake, vote, and contribute to earn.
-              </p>
+              <h3>{wallet ? 'My Wallet' : 'Create Wallet'}</h3>
+              <p>{wallet ? `Balance: ${balance?.balance?.toFixed(4) || '0'} VIBE` : 'Generate a new wallet'}</p>
             </div>
 
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🗳️</span>
+            <div className="action-card" onClick={() => setCurrentView('faucet')}>
+              <div className="action-icon">
+                <span>🚿</span>
               </div>
-              <h3>Democratic Governance</h3>
-              <p>
-                Community-driven validator selection. Your voice matters.
-                Vote for validators you trust.
-              </p>
+              <h3>Faucet</h3>
+              <p>{faucetCooldown > 0 ? `Cooldown: ${faucetCooldown}min` : `Get ${FAUCET.amount} free VIBE`}</p>
             </div>
 
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>⚡</span>
+            <div className="action-card" onClick={() => setCurrentView('send')}>
+              <div className="action-icon">
+                <span>📤</span>
               </div>
-              <h3>Fast & Efficient</h3>
-              <p>
-                10-second block times. Low fees. No energy-intensive mining.
-                Built for the future.
-              </p>
+              <h3>Send VIBE</h3>
+              <p>Transfer to another address</p>
             </div>
 
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🌱</span>
+            <div className="action-card" onClick={() => { setCurrentView('explorer'); loadBlocks(); }}>
+              <div className="action-icon">
+                <span>🔍</span>
               </div>
-              <h3>Sustainable</h3>
-              <p>
-                Eco-friendly by design. No proof-of-work mining means minimal
-                environmental impact.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🔓</span>
-              </div>
-              <h3>Open Source</h3>
-              <p>
-                Fully transparent. Review the code, contribute, and help shape
-                the future of VibeCoin.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🎨</span>
-              </div>
-              <h3>Creator Economy</h3>
-              <p>
-                Reward developers, artists, and educators.
-                Contribution is valued and incentivized.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Tokenomics Section */}
-      <section className="tokenomics-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Tokenomics</h2>
-            <p>Designed for sustainability and fair distribution</p>
-          </div>
-
-          <div className="tokenomics-grid">
-            <div className="token-stat">
-              <span className="token-value">VIBE</span>
-              <span className="token-label">Symbol</span>
-            </div>
-            <div className="token-stat">
-              <span className="token-value">21M</span>
-              <span className="token-label">Max Supply</span>
-            </div>
-            <div className="token-stat">
-              <span className="token-value">~10s</span>
-              <span className="token-label">Block Time</span>
-            </div>
-            <div className="token-stat">
-              <span className="token-value">8</span>
-              <span className="token-label">Decimals</span>
-            </div>
-          </div>
-
-          <div className="distribution-card">
-            <h3>Initial Distribution</h3>
-            <div className="distribution-bars">
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Community Rewards</span>
-                  <span>60%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '60%'}}></div>
-                </div>
-              </div>
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Development Fund</span>
-                  <span>15%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '15%'}}></div>
-                </div>
-              </div>
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Team & Founders</span>
-                  <span>15%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '15%'}}></div>
-                </div>
-              </div>
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Reserve</span>
-                  <span>10%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '10%'}}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Roadmap Preview */}
-      <section className="roadmap-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Roadmap</h2>
-            <p>Our journey to revolutionize crypto</p>
-          </div>
-
-          <div className="roadmap-timeline">
-            <div className="roadmap-item active">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 1</span>
-                <h4>Foundation</h4>
-                <p>Core blockchain development, wallet implementation, testnet preparation</p>
-                <span className="roadmap-status">In Progress</span>
-              </div>
-            </div>
-
-            <div className="roadmap-item">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 2</span>
-                <h4>Growth</h4>
-                <p>Testnet launch, smart contracts, web & mobile wallets</p>
-                <span className="roadmap-status upcoming">Upcoming</span>
-              </div>
-            </div>
-
-            <div className="roadmap-item">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 3</span>
-                <h4>Ecosystem</h4>
-                <p>DAO governance, creator rewards program, partnerships</p>
-                <span className="roadmap-status upcoming">Upcoming</span>
-              </div>
-            </div>
-
-            <div className="roadmap-item">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 4</span>
-                <h4>Mainstream</h4>
-                <p>Mainnet launch, exchange listings, NFT marketplace</p>
-                <span className="roadmap-status upcoming">Upcoming</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="container">
-          <div className="cta-card">
-            <h2>Be Part of the Vibe</h2>
-            <p>Join the waitlist to get notified when the testnet launches and receive early access.</p>
-
-            {subscribed ? (
-              <div className="subscribed-message">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                <span>You're on the list! We'll notify you when we launch.</span>
-              </div>
-            ) : (
-              <form className="subscribe-form" onSubmit={handleSubscribe}>
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <button type="submit" className="btn btn-primary">
-                  Join Waitlist
-                </button>
-              </form>
-            )}
-
-            <div className="social-links">
-              <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="social-link">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-              </a>
+              <h3>Explorer</h3>
+              <p>View blocks & transactions</p>
             </div>
           </div>
         </div>
@@ -386,95 +388,265 @@ function App() {
     </>
   );
 
-  const renderWhitepaper = () => (
+  const renderWallet = () => (
     <section className="page-section">
       <div className="container">
         <button className="back-btn" onClick={() => setCurrentView('home')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to Home
+          ← Back
         </button>
 
-        <article className="whitepaper-content">
-          <h1>VibeCoin Whitepaper</h1>
-          <p className="subtitle">The Cryptocurrency Born from VibeCoding</p>
+        <h1>👛 My Wallet</h1>
 
-          <section className="wp-section">
-            <h2>Abstract</h2>
-            <p>
-              VibeCoin (VIBE) represents a paradigm shift in cryptocurrency design,
-              embedding the philosophy of VibeCoding into its core architecture.
-              Unlike traditional cryptocurrencies that prioritize computational power
-              or capital accumulation, VibeCoin introduces "Proof of Vibe" (PoV) —
-              a novel consensus mechanism that rewards creativity, community contribution,
-              and sustainable development practices.
-            </p>
-          </section>
-
-          <section className="wp-section">
-            <h2>The VibeCoding Philosophy</h2>
-            <p>
-              VibeCoding emerged as a counter-movement to the industrialization of software development.
-              It advocates for:
-            </p>
-            <ul>
-              <li><strong>Flow Over Force:</strong> Writing code when inspiration strikes</li>
-              <li><strong>Intuition-Driven Development:</strong> Trusting developer instincts</li>
-              <li><strong>Creative Expression:</strong> Every line of code as art</li>
-              <li><strong>Community Harmony:</strong> Building together, growing together</li>
-            </ul>
-          </section>
-
-          <section className="wp-section">
-            <h2>Proof of Vibe (PoV)</h2>
-            <p>
-              Our consensus mechanism combines elements of Proof of Stake (PoS),
-              Delegated Proof of Stake (DPoS), and a novel reputation system:
-            </p>
-            <div className="formula-box">
-              <strong>VibeScore = (Stake × 0.4) + (Votes × 0.3) + (Contribution × 0.3)</strong>
+        {!wallet ? (
+          <div className="wallet-create-card">
+            <div className="create-section">
+              <h3>Create New Wallet</h3>
+              <p>Generate a new secure wallet</p>
+              <button className="btn btn-primary btn-lg" onClick={createWallet} disabled={loading || !isOnline}>
+                {loading ? 'Creating...' : 'Create Wallet'}
+              </button>
             </div>
-            <p>
-              Validators are selected based on their VibeScore, ensuring that
-              those who contribute most to the ecosystem have the greatest influence.
-            </p>
-          </section>
 
-          <section className="wp-section">
-            <h2>Technical Specifications</h2>
-            <table className="specs-table">
-              <tbody>
-                <tr><td>Symbol</td><td>VIBE</td></tr>
-                <tr><td>Total Supply</td><td>21,000,000</td></tr>
-                <tr><td>Block Time</td><td>~10 seconds</td></tr>
-                <tr><td>Consensus</td><td>Proof of Vibe (PoV)</td></tr>
-                <tr><td>Max Validators</td><td>21</td></tr>
-                <tr><td>Minimum Stake</td><td>100 VIBE</td></tr>
-                <tr><td>Decimals</td><td>8</td></tr>
-              </tbody>
-            </table>
-          </section>
+            <div className="divider">or</div>
 
-          <section className="wp-section">
-            <h2>Conclusion</h2>
-            <p>
-              VibeCoin is more than a cryptocurrency — it's a movement. By aligning
-              economic incentives with creative contribution and community building,
-              we create a sustainable ecosystem where developers, artists, and
-              educators can thrive.
-            </p>
-            <p className="quote">
-              "Code with feeling. Build with passion. Create with vibes."
-            </p>
-          </section>
-        </article>
+            <div className="import-section">
+              <h3>Import Wallet</h3>
+              <p>Enter your private key</p>
+              <input
+                type="password"
+                placeholder="Private key..."
+                value={importKey}
+                onChange={(e) => setImportKey(e.target.value)}
+                className="input-field"
+              />
+              <button className="btn btn-secondary" onClick={handleImportWallet} disabled={loading || !importKey}>
+                Import
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="wallet-card">
+            <div className="balance-display">
+              <span className="balance-amount">{balance?.balance?.toFixed(4) || '0.0000'}</span>
+              <span className="balance-currency">{TOKEN.symbol}</span>
+            </div>
+
+            <div className="wallet-details">
+              <div className="detail-row">
+                <span className="detail-label">Address</span>
+                <div className="detail-value">
+                  <code>{shortAddr(wallet.publicKey)}</code>
+                  <button className="copy-btn" onClick={() => navigator.clipboard.writeText(wallet.publicKey)}>
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              {wallet.privateKey && (
+                <div className="detail-row">
+                  <span className="detail-label">Private Key</span>
+                  <div className="detail-value">
+                    <code className="blur-text">{shortAddr(wallet.privateKey)}</code>
+                    <button className="copy-btn" onClick={() => navigator.clipboard.writeText(wallet.privateKey!)}>
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="wallet-actions">
+              <button className="btn btn-primary" onClick={() => setCurrentView('faucet')}>
+                Get VIBE
+              </button>
+              <button className="btn btn-secondary" onClick={() => setCurrentView('send')}>
+                Send
+              </button>
+              <button className="btn btn-danger" onClick={disconnectWallet}>
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
+  const renderFaucet = () => (
+    <section className="page-section">
+      <div className="container">
+        <button className="back-btn" onClick={() => setCurrentView('home')}>
+          ← Back
+        </button>
+
+        <div className="faucet-card">
+          <div className="faucet-icon">🚿</div>
+          <h1>Testnet Faucet</h1>
+          <p>Get free {TOKEN.symbol} tokens for testing</p>
+
+          <div className="faucet-amount">
+            <span className="amount">{FAUCET.amount}</span>
+            <span className="currency">{TOKEN.symbol}</span>
+          </div>
+
+          {!wallet ? (
+            <>
+              <p className="faucet-note">Create a wallet first to claim tokens</p>
+              <button className="btn btn-primary btn-lg" onClick={createWallet} disabled={loading}>
+                Create Wallet
+              </button>
+            </>
+          ) : faucetCooldown > 0 ? (
+            <>
+              <p className="faucet-note">Next claim available in {faucetCooldown} minutes</p>
+              <button className="btn btn-secondary btn-lg" disabled>
+                Cooldown Active
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="faucet-note">Your address: {shortAddr(wallet.publicKey)}</p>
+              <button className="btn btn-primary btn-lg" onClick={claimFaucet} disabled={loading || !isOnline}>
+                {loading ? 'Claiming...' : `Claim ${FAUCET.amount} ${TOKEN.symbol}`}
+              </button>
+            </>
+          )}
+
+          <p className="faucet-disclaimer">
+            Testnet tokens have no real value
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderSend = () => (
+    <section className="page-section">
+      <div className="container">
+        <button className="back-btn" onClick={() => setCurrentView('home')}>
+          ← Back
+        </button>
+
+        <h1>📤 Send {TOKEN.symbol}</h1>
+
+        {!wallet ? (
+          <div className="send-card">
+            <p>Create a wallet first to send tokens</p>
+            <button className="btn btn-primary btn-lg" onClick={createWallet}>
+              Create Wallet
+            </button>
+          </div>
+        ) : (
+          <div className="send-card">
+            <div className="balance-banner">
+              Available: <strong>{balance?.available?.toFixed(4) || '0'} {TOKEN.symbol}</strong>
+            </div>
+
+            <div className="form-group">
+              <label>Recipient Address</label>
+              <input
+                type="text"
+                placeholder="Enter recipient address..."
+                value={sendTo}
+                onChange={(e) => setSendTo(e.target.value)}
+                className="input-field"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Amount ({TOKEN.symbol})</label>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={sendAmount}
+                onChange={(e) => setSendAmount(e.target.value)}
+                className="input-field"
+                min="0"
+                step="0.0001"
+              />
+            </div>
+
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={handleSend}
+              disabled={loading || !sendTo || !sendAmount || !isOnline}
+            >
+              {loading ? 'Sending...' : 'Send Transaction'}
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
+  const renderExplorer = () => (
+    <section className="page-section">
+      <div className="container">
+        <button className="back-btn" onClick={() => setCurrentView('home')}>
+          ← Back
+        </button>
+
+        <h1>🔍 Blockchain Explorer</h1>
+
+        <div className="explorer-stats">
+          <div className="stat-card">
+            <span className="stat-value">{nodeInfo?.blocks || 0}</span>
+            <span className="stat-label">Blocks</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{nodeInfo?.transactions || 0}</span>
+            <span className="stat-label">Transactions</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{nodeInfo?.circulatingSupply?.toFixed(0) || 0}</span>
+            <span className="stat-label">Circulating</span>
+          </div>
+        </div>
+
+        <h2>Recent Blocks</h2>
+        <div className="blocks-list">
+          {blocks.length === 0 ? (
+            <p className="empty-state">No blocks yet or node is offline</p>
+          ) : (
+            blocks.map((block) => (
+              <div key={block.index} className="block-item">
+                <div className="block-header">
+                  <span className="block-number">Block #{block.index}</span>
+                  <span className="block-time">
+                    {new Date(block.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <div className="block-details">
+                  <div className="detail">
+                    <span className="label">Hash</span>
+                    <code>{block.hash.substring(0, 16)}...</code>
+                  </div>
+                  <div className="detail">
+                    <span className="label">Transactions</span>
+                    <span>{block.transactions.length}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <button className="btn btn-secondary" onClick={loadBlocks} style={{ marginTop: '1rem' }}>
+          Refresh
+        </button>
       </div>
     </section>
   );
 
   return (
     <div className="app">
+      {/* Toast Messages */}
+      {(error || success) && (
+        <div className={`toast ${error ? 'error' : 'success'}`}>
+          {error || success}
+        </div>
+      )}
+
       <header className="header">
         <div className="container header-content">
           <div className="logo" onClick={() => setCurrentView('home')}>
@@ -485,16 +657,21 @@ function App() {
           </div>
 
           <nav className="nav">
-            <button className="nav-link" onClick={() => setCurrentView('whitepaper')}>Whitepaper</button>
-            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="nav-link">GitHub</a>
-            <span className="nav-badge">Testnet Soon</span>
+            <span className={`status-dot ${isOnline ? 'online' : 'offline'}`}></span>
+            <span className="nav-status">{isOnline ? 'Connected' : 'Offline'}</span>
+            {wallet && (
+              <span className="nav-balance">{balance?.balance?.toFixed(2) || '0'} VIBE</span>
+            )}
           </nav>
         </div>
       </header>
 
       <main className="main">
         {currentView === 'home' && renderHome()}
-        {currentView === 'whitepaper' && renderWhitepaper()}
+        {currentView === 'wallet' && renderWallet()}
+        {currentView === 'faucet' && renderFaucet()}
+        {currentView === 'send' && renderSend()}
+        {currentView === 'explorer' && renderExplorer()}
       </main>
 
       <footer className="footer">
@@ -505,11 +682,9 @@ function App() {
           </div>
           <p className="footer-tagline">Code with feeling. Build with passion. Create with vibes.</p>
           <div className="footer-links">
+            <span>API: {API_URL}</span>
+            <span className="divider">•</span>
             <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer">GitHub</a>
-            <span className="divider">•</span>
-            <span>MIT License</span>
-            <span className="divider">•</span>
-            <span>Built by BLKSTUDIO</span>
           </div>
         </div>
       </footer>
