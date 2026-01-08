@@ -13,12 +13,18 @@ export interface APIConfig {
   host: string;
 }
 
+// Faucet configuration
+const FAUCET_AMOUNT = 100; // VIBE per claim
+const FAUCET_COOLDOWN = 60 * 60 * 1000; // 1 hour in milliseconds
+const MAX_FAUCET_CLAIMS = 5; // Max claims per address per day
+
 export class API {
   private app: Express;
   private blockchain: Blockchain;
   private storage: Storage;
   private config: APIConfig;
   private nodeWallet: Wallet | null = null;
+  private faucetClaims: Map<string, { lastClaim: number; dailyClaims: number; resetDay: number }> = new Map();
 
   constructor(blockchain: Blockchain, storage: Storage, config: Partial<APIConfig> = {}) {
     this.blockchain = blockchain;
@@ -265,31 +271,113 @@ export class API {
 
     // ==================== FAUCET (Testnet only) ====================
 
-    // Get free testnet VIBE
+    // Get free testnet VIBE (with rate limiting)
     this.app.post('/faucet', async (req: Request, res: Response) => {
       try {
         const { address } = req.body;
-        const amount = 100; // Free testnet VIBE
 
         if (!address) {
           return res.status(400).json({ error: 'address required' });
         }
 
+        const now = Date.now();
+        const today = Math.floor(now / (24 * 60 * 60 * 1000)); // Day number
+
+        // Check faucet limits
+        const claimInfo = this.faucetClaims.get(address);
+
+        if (claimInfo) {
+          // Reset daily claims if new day
+          if (claimInfo.resetDay !== today) {
+            claimInfo.dailyClaims = 0;
+            claimInfo.resetDay = today;
+          }
+
+          // Check cooldown (1 hour between claims)
+          const timeSinceLastClaim = now - claimInfo.lastClaim;
+          if (timeSinceLastClaim < FAUCET_COOLDOWN) {
+            const minutesLeft = Math.ceil((FAUCET_COOLDOWN - timeSinceLastClaim) / 60000);
+            return res.status(429).json({
+              error: `Faucet cooldown active. Try again in ${minutesLeft} minutes.`,
+              nextClaimIn: minutesLeft
+            });
+          }
+
+          // Check daily limit
+          if (claimInfo.dailyClaims >= MAX_FAUCET_CLAIMS) {
+            return res.status(429).json({
+              error: `Daily faucet limit reached (${MAX_FAUCET_CLAIMS} claims per day). Try again tomorrow.`,
+              dailyLimit: MAX_FAUCET_CLAIMS
+            });
+          }
+
+          // Update claim info
+          claimInfo.lastClaim = now;
+          claimInfo.dailyClaims++;
+        } else {
+          // First claim for this address
+          this.faucetClaims.set(address, {
+            lastClaim: now,
+            dailyClaims: 1,
+            resetDay: today
+          });
+        }
+
         // Create faucet transaction
-        const tx = Transaction.createCoinbase(address, amount);
+        const tx = Transaction.createCoinbase(address, FAUCET_AMOUNT);
         tx.data = 'Testnet Faucet';
 
         this.blockchain.pendingTransactions.push(tx);
         await this.storage.saveBlockchain(this.blockchain);
 
+        const claimData = this.faucetClaims.get(address)!;
+        const remainingClaims = MAX_FAUCET_CLAIMS - claimData.dailyClaims;
+
         res.json({
           success: true,
-          message: `${amount} VIBE sent to ${address}`,
-          note: 'Transaction will be confirmed in the next block'
+          message: `${FAUCET_AMOUNT} VIBE sent to your wallet!`,
+          amount: FAUCET_AMOUNT,
+          remainingClaims,
+          nextClaimIn: 60, // minutes
+          note: 'Transaction will be confirmed in ~10 seconds'
         });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
+    });
+
+    // Check faucet status for an address
+    this.app.get('/faucet/status/:address', (req: Request, res: Response) => {
+      const { address } = req.params;
+      const now = Date.now();
+      const today = Math.floor(now / (24 * 60 * 60 * 1000));
+
+      const claimInfo = this.faucetClaims.get(address);
+
+      if (!claimInfo) {
+        return res.json({
+          canClaim: true,
+          remainingClaims: MAX_FAUCET_CLAIMS,
+          nextClaimIn: 0
+        });
+      }
+
+      // Reset if new day
+      let dailyClaims = claimInfo.dailyClaims;
+      if (claimInfo.resetDay !== today) {
+        dailyClaims = 0;
+      }
+
+      const timeSinceLastClaim = now - claimInfo.lastClaim;
+      const canClaim = timeSinceLastClaim >= FAUCET_COOLDOWN && dailyClaims < MAX_FAUCET_CLAIMS;
+      const minutesLeft = timeSinceLastClaim >= FAUCET_COOLDOWN ? 0 : Math.ceil((FAUCET_COOLDOWN - timeSinceLastClaim) / 60000);
+
+      res.json({
+        canClaim,
+        remainingClaims: MAX_FAUCET_CLAIMS - dailyClaims,
+        nextClaimIn: minutesLeft,
+        dailyLimit: MAX_FAUCET_CLAIMS
+      });
     });
 
     // ==================== VALIDATION ====================

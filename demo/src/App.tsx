@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import type { NodeInfo, Block } from './api';
 import { API_URL, TOKEN, REFRESH_INTERVAL } from './config';
 import './App.css';
 
-type View = 'explorer' | 'wallet' | 'whitepaper';
+type View = 'chat' | 'explorer' | 'wallet' | 'whitepaper';
 
-// Storage key for wallet
+// Storage keys
 const WALLET_STORAGE_KEY = 'vibecoin_wallet';
+const CHAT_HISTORY_KEY = 'vibecoin_chat_history';
 
 interface StoredWallet {
   address: string;
@@ -15,8 +16,15 @@ interface StoredWallet {
   privateKey: string;
 }
 
+interface ChatMessage {
+  id: string;
+  type: 'user' | 'system';
+  content: string;
+  timestamp: number;
+}
+
 function App() {
-  const [currentView, setCurrentView] = useState<View>('explorer');
+  const [currentView, setCurrentView] = useState<View>('chat');
   const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(false);
@@ -26,20 +34,63 @@ function App() {
   // Wallet state
   const [wallet, setWallet] = useState<StoredWallet | null>(null);
   const [balance, setBalance] = useState<number>(0);
-  const [walletLoading, setWalletLoading] = useState<boolean>(false);
-  const [faucetMessage, setFaucetMessage] = useState<string>('');
 
-  // Load wallet from localStorage
+  // Chat state
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Load wallet and chat history from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(WALLET_STORAGE_KEY);
-    if (stored) {
+    const storedWallet = localStorage.getItem(WALLET_STORAGE_KEY);
+    if (storedWallet) {
       try {
-        setWallet(JSON.parse(stored));
+        setWallet(JSON.parse(storedWallet));
       } catch (e) {
         console.error('Failed to load wallet:', e);
       }
     }
+
+    const storedChat = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (storedChat) {
+      try {
+        setChatMessages(JSON.parse(storedChat));
+      } catch (e) {
+        console.error('Failed to load chat history:', e);
+      }
+    } else {
+      // Welcome message
+      setChatMessages([{
+        id: 'welcome',
+        type: 'system',
+        content: `Welcome to VibeCoin! I'm your VibeChat assistant.
+
+You can talk to me naturally, for example:
+• "Create a wallet for me"
+• "Give me some VIBE" or "I need tokens"
+• "What's my balance?"
+• "Send 50 VIBE to 04abc..."
+• "Show me the latest blocks"
+• "How many blocks are there?"
+
+What would you like to do?`,
+        timestamp: Date.now()
+      }]);
+    }
   }, []);
+
+  // Save chat history
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatMessages.slice(-50))); // Keep last 50 messages
+    }
+  }, [chatMessages]);
+
+  // Scroll to bottom of chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // Fetch data from API
   const fetchData = useCallback(async () => {
@@ -50,7 +101,7 @@ function App() {
       ]);
 
       setNodeInfo(info);
-      setBlocks(blocksData.blocks.reverse()); // Latest first
+      setBlocks(blocksData.blocks.reverse());
       setIsOnline(true);
       setLoading(false);
     } catch (error) {
@@ -87,38 +138,206 @@ function App() {
     }
   }, [wallet, fetchBalance]);
 
-  // Create new wallet
-  const createWallet = async () => {
-    setWalletLoading(true);
-    try {
-      const newWallet = await api.createWallet();
-      const walletData: StoredWallet = {
-        address: newWallet.address,
-        publicKey: newWallet.publicKey,
-        privateKey: newWallet.privateKey || ''
-      };
-      setWallet(walletData);
-      localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(walletData));
-      setFaucetMessage('');
-    } catch (error) {
-      console.error('Failed to create wallet:', error);
-    }
-    setWalletLoading(false);
+  // Add message to chat
+  const addMessage = (type: 'user' | 'system', content: string) => {
+    const message: ChatMessage = {
+      id: Date.now().toString(),
+      type,
+      content,
+      timestamp: Date.now()
+    };
+    setChatMessages(prev => [...prev, message]);
+    return message;
   };
 
-  // Claim faucet
-  const claimFaucet = async () => {
-    if (!wallet) return;
-    setWalletLoading(true);
-    try {
-      const result = await api.claimFaucet(wallet.publicKey);
-      setFaucetMessage(result.message);
-      // Refresh balance after a delay (wait for mining)
-      setTimeout(fetchBalance, 2000);
-    } catch (error: any) {
-      setFaucetMessage(error.message || 'Failed to claim faucet');
+  // Parse and execute natural language commands
+  const processCommand = async (input: string) => {
+    const lowerInput = input.toLowerCase().trim();
+
+    // Create wallet
+    if (lowerInput.match(/create|new|make|generate/i) && lowerInput.match(/wallet|account/i)) {
+      if (wallet) {
+        return `You already have a wallet! Your address is:\n\n\`${wallet.publicKey.substring(0, 32)}...\`\n\nBalance: ${balance.toFixed(2)} VIBE`;
+      }
+
+      try {
+        const newWallet = await api.createWallet();
+        const walletData: StoredWallet = {
+          address: newWallet.address,
+          publicKey: newWallet.publicKey,
+          privateKey: newWallet.privateKey || ''
+        };
+        setWallet(walletData);
+        localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(walletData));
+        return `Wallet created successfully!\n\nYour address:\n\`${walletData.publicKey}\`\n\nNow you can ask me for some free testnet VIBE!`;
+      } catch (error) {
+        return `Failed to create wallet. The network might be offline.`;
+      }
     }
-    setWalletLoading(false);
+
+    // Get faucet / request tokens
+    if (lowerInput.match(/faucet|give|send|want|need|get/i) && lowerInput.match(/vibe|token|coin|money|some/i)) {
+      if (!wallet) {
+        return `You don't have a wallet yet! Say "create a wallet" first.`;
+      }
+
+      try {
+        const result = await api.claimFaucet(wallet.publicKey);
+        setTimeout(fetchBalance, 2000);
+        return `${result.message}\n\n📦 ${result.remainingClaims} claims remaining today\n⏱️ Next claim available in ${result.nextClaimIn} minutes`;
+      } catch (error: any) {
+        const errorData = error.message ? JSON.parse(error.message.replace('HTTP 429: ', '')) : null;
+        if (errorData?.nextClaimIn) {
+          return `⏱️ ${errorData.error}`;
+        }
+        return `${error.message || 'Failed to claim faucet'}`;
+      }
+    }
+
+    // Check balance
+    if (lowerInput.match(/balance|how much|my vibe|have i/i)) {
+      if (!wallet) {
+        return `You don't have a wallet yet! Say "create a wallet" first.`;
+      }
+
+      await fetchBalance();
+      return `Your balance: **${balance.toFixed(2)} VIBE**\n\nAddress: \`${wallet.publicKey.substring(0, 24)}...\``;
+    }
+
+    // Send VIBE
+    if (lowerInput.match(/send|transfer|pay/i)) {
+      if (!wallet) {
+        return `You don't have a wallet yet! Say "create a wallet" first.`;
+      }
+
+      // Extract amount and address
+      const amountMatch = lowerInput.match(/(\d+(?:\.\d+)?)\s*(?:vibe)?/i);
+      const addressMatch = input.match(/(?:to\s+)?([0-9a-f]{64,})/i) || input.match(/(?:to\s+)?(04[0-9a-f]{128})/i);
+
+      if (!amountMatch) {
+        return `Please specify an amount. Example: "Send 50 VIBE to 04abc..."`;
+      }
+
+      if (!addressMatch) {
+        return `Please provide a valid address. Example: "Send 50 VIBE to 04abc..."`;
+      }
+
+      const amount = parseFloat(amountMatch[1]);
+      const toAddress = addressMatch[1];
+
+      if (amount > balance) {
+        return `Insufficient balance! You have ${balance.toFixed(2)} VIBE but tried to send ${amount} VIBE.`;
+      }
+
+      if (amount <= 0) {
+        return `Amount must be greater than 0.`;
+      }
+
+      try {
+        await api.sendTransaction(wallet.publicKey, toAddress, amount, wallet.privateKey);
+        setTimeout(fetchBalance, 2000);
+        return `Transaction sent!\n\n💸 Amount: ${amount} VIBE\n📬 To: \`${toAddress.substring(0, 16)}...\`\n\nTransaction will be confirmed in ~10 seconds.`;
+      } catch (error: any) {
+        return `Transaction failed: ${error.message}`;
+      }
+    }
+
+    // Show blocks
+    if (lowerInput.match(/block|chain|latest|recent/i)) {
+      if (!nodeInfo) {
+        return `Network is offline. Try again later.`;
+      }
+
+      const latestBlocks = blocks.slice(0, 5);
+      let response = `📦 **Blockchain Status**\n\n`;
+      response += `• Blocks: ${nodeInfo.blocks}\n`;
+      response += `• Supply: ${nodeInfo.circulatingSupply.toFixed(0)} VIBE\n`;
+      response += `• Pending TX: ${nodeInfo.pendingTransactions}\n\n`;
+      response += `**Latest Blocks:**\n`;
+
+      latestBlocks.forEach(block => {
+        response += `• Block #${block.index}: ${block.transactions.length} tx, nonce ${block.nonce.toLocaleString()}\n`;
+      });
+
+      return response;
+    }
+
+    // Show address
+    if (lowerInput.match(/address|my wallet|public key/i)) {
+      if (!wallet) {
+        return `You don't have a wallet yet! Say "create a wallet" first.`;
+      }
+
+      return `Your VibeCoin address:\n\n\`${wallet.publicKey}\`\n\nShare this address to receive VIBE!`;
+    }
+
+    // Network status
+    if (lowerInput.match(/status|network|online|stats/i)) {
+      if (!nodeInfo) {
+        return `Network is offline. Try again later.`;
+      }
+
+      return `🌐 **Network Status**\n\n• Status: ${isOnline ? '🟢 Online' : '🔴 Offline'}\n• Blocks: ${nodeInfo.blocks}\n• Supply: ${nodeInfo.circulatingSupply.toFixed(0)} VIBE\n• Difficulty: ${nodeInfo.difficulty}\n• Pending TX: ${nodeInfo.pendingTransactions}`;
+    }
+
+    // Help
+    if (lowerInput.match(/help|what can|how to|commands/i)) {
+      return `Here's what I can do:\n\n**Wallet:**\n• "Create a wallet"\n• "What's my address?"\n• "What's my balance?"\n\n**Tokens:**\n• "Give me some VIBE"\n• "Send 50 VIBE to 04abc..."\n\n**Explorer:**\n• "Show me the latest blocks"\n• "What's the network status?"\n\nJust talk naturally - I'll understand!`;
+    }
+
+    // Clear chat
+    if (lowerInput.match(/clear|reset|start over/i) && lowerInput.match(/chat|history|messages/i)) {
+      setChatMessages([{
+        id: Date.now().toString(),
+        type: 'system',
+        content: 'Chat cleared! How can I help you?',
+        timestamp: Date.now()
+      }]);
+      localStorage.removeItem(CHAT_HISTORY_KEY);
+      return null; // Don't add another message
+    }
+
+    // Delete wallet
+    if (lowerInput.match(/delete|remove|forget/i) && lowerInput.match(/wallet|account/i)) {
+      if (!wallet) {
+        return `You don't have a wallet to delete.`;
+      }
+
+      localStorage.removeItem(WALLET_STORAGE_KEY);
+      setWallet(null);
+      setBalance(0);
+      return `Wallet deleted. Your funds are lost forever (it's testnet, don't worry!). Say "create a wallet" to start fresh.`;
+    }
+
+    // Greeting
+    if (lowerInput.match(/^(hi|hello|hey|yo|sup|bonjour|salut)/i)) {
+      return `Hey there! Welcome to VibeCoin. ${wallet ? `Your balance is ${balance.toFixed(2)} VIBE.` : `Say "create a wallet" to get started!`}`;
+    }
+
+    // Default response
+    return `I didn't quite understand that. Try saying:\n• "Create a wallet"\n• "Give me some VIBE"\n• "What's my balance?"\n• "Show me the blocks"\n\nOr just say "help" for more options!`;
+  };
+
+  // Handle chat submit
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isProcessing) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    addMessage('user', userMessage);
+    setIsProcessing(true);
+
+    try {
+      const response = await processCommand(userMessage);
+      if (response) {
+        addMessage('system', response);
+      }
+    } catch (error) {
+      addMessage('system', 'Something went wrong. Please try again.');
+    }
+
+    setIsProcessing(false);
   };
 
   // Format timestamp
@@ -137,9 +356,73 @@ function App() {
     return `${addr.substring(0, 8)}...${addr.substring(addr.length - 6)}`;
   };
 
+  const renderChat = () => (
+    <div className="chat-container">
+      <div className="chat-header">
+        <h2>VibeChat</h2>
+        <p>Talk to VibeCoin naturally - just like VibeCoding!</p>
+        {wallet && (
+          <div className="chat-wallet-info">
+            <span className="chat-balance">{balance.toFixed(2)} VIBE</span>
+          </div>
+        )}
+      </div>
+
+      <div className="chat-messages">
+        {chatMessages.map((msg) => (
+          <div key={msg.id} className={`chat-message ${msg.type}`}>
+            <div className="message-content">
+              {msg.content.split('\n').map((line, i) => (
+                <p key={i}>{line.includes('`') ? (
+                  line.split('`').map((part, j) =>
+                    j % 2 === 1 ? <code key={j}>{part}</code> : part
+                  )
+                ) : line.includes('**') ? (
+                  line.split('**').map((part, j) =>
+                    j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+                  )
+                ) : line}</p>
+              ))}
+            </div>
+            <span className="message-time">
+              {new Date(msg.timestamp).toLocaleTimeString()}
+            </span>
+          </div>
+        ))}
+        {isProcessing && (
+          <div className="chat-message system">
+            <div className="message-content">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      <form className="chat-input-form" onSubmit={handleChatSubmit}>
+        <input
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          placeholder="Type a message... (e.g., 'give me some VIBE')"
+          disabled={isProcessing || !isOnline}
+        />
+        <button type="submit" disabled={isProcessing || !chatInput.trim() || !isOnline}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 2L11 13"/>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  );
+
   const renderExplorer = () => (
     <div className="explorer">
-      {/* Stats Cards */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon blocks-icon">
@@ -197,7 +480,6 @@ function App() {
         </div>
       </div>
 
-      {/* Blocks List */}
       <div className="blocks-section">
         <div className="section-header">
           <h2>Recent Blocks</h2>
@@ -237,7 +519,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Expanded block details */}
               {selectedBlock?.index === block.index && (
                 <div className="block-expanded">
                   <div className="expanded-row">
@@ -270,87 +551,6 @@ function App() {
           ))}
         </div>
       </div>
-    </div>
-  );
-
-  const renderWallet = () => (
-    <div className="wallet-page">
-      {!wallet ? (
-        <div className="wallet-create">
-          <div className="wallet-icon">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="2" y="4" width="20" height="16" rx="2"/>
-              <path d="M22 10H18a2 2 0 0 0 0 4h4"/>
-              <circle cx="18" cy="12" r="1"/>
-            </svg>
-          </div>
-          <h2>Create Your Wallet</h2>
-          <p>Get started with VibeCoin by creating a new testnet wallet.</p>
-          <button
-            className="btn btn-primary btn-lg"
-            onClick={createWallet}
-            disabled={walletLoading || !isOnline}
-          >
-            {walletLoading ? 'Creating...' : 'Create Wallet'}
-          </button>
-          {!isOnline && (
-            <p className="offline-warning">Node is offline. Please wait...</p>
-          )}
-        </div>
-      ) : (
-        <div className="wallet-dashboard">
-          <div className="wallet-balance-card">
-            <span className="balance-label">Your Balance</span>
-            <div className="balance-amount">
-              <span className="balance-value">{balance.toFixed(2)}</span>
-              <span className="balance-symbol">VIBE</span>
-            </div>
-          </div>
-
-          <div className="wallet-address-card">
-            <span className="address-label">Your Address</span>
-            <code className="address-value">{wallet.publicKey}</code>
-            <button
-              className="copy-btn"
-              onClick={() => {
-                navigator.clipboard.writeText(wallet.publicKey);
-              }}
-            >
-              Copy
-            </button>
-          </div>
-
-          <div className="wallet-actions">
-            <div className="faucet-card">
-              <h3>Testnet Faucet</h3>
-              <p>Get free testnet VIBE to try the network.</p>
-              <button
-                className="btn btn-secondary"
-                onClick={claimFaucet}
-                disabled={walletLoading || !isOnline}
-              >
-                {walletLoading ? 'Claiming...' : 'Claim 100 VIBE'}
-              </button>
-              {faucetMessage && (
-                <p className="faucet-message">{faucetMessage}</p>
-              )}
-            </div>
-          </div>
-
-          <button
-            className="btn btn-danger btn-sm"
-            onClick={() => {
-              if (confirm('Are you sure? This will delete your wallet.')) {
-                localStorage.removeItem(WALLET_STORAGE_KEY);
-                setWallet(null);
-                setBalance(0);
-              }
-            }}
-          >
-            Delete Wallet
-          </button>
-        </div>
-      )}
     </div>
   );
 
@@ -449,7 +649,7 @@ function App() {
     <div className="app">
       <header className="header">
         <div className="container header-content">
-          <div className="logo" onClick={() => setCurrentView('explorer')}>
+          <div className="logo" onClick={() => setCurrentView('chat')}>
             <div className="logo-icon">
               <span>⚡</span>
             </div>
@@ -459,16 +659,16 @@ function App() {
 
           <nav className="nav">
             <button
+              className={`nav-link ${currentView === 'chat' ? 'active' : ''}`}
+              onClick={() => setCurrentView('chat')}
+            >
+              VibeChat
+            </button>
+            <button
               className={`nav-link ${currentView === 'explorer' ? 'active' : ''}`}
               onClick={() => setCurrentView('explorer')}
             >
               Explorer
-            </button>
-            <button
-              className={`nav-link ${currentView === 'wallet' ? 'active' : ''}`}
-              onClick={() => setCurrentView('wallet')}
-            >
-              Wallet
             </button>
             <button
               className={`nav-link ${currentView === 'whitepaper' ? 'active' : ''}`}
@@ -495,8 +695,8 @@ function App() {
 
       <main className="main">
         <div className="container">
+          {currentView === 'chat' && renderChat()}
           {currentView === 'explorer' && renderExplorer()}
-          {currentView === 'wallet' && renderWallet()}
           {currentView === 'whitepaper' && renderWhitepaper()}
         </div>
       </main>

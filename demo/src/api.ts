@@ -108,8 +108,8 @@ class VibeCoinAPI {
   }
 
   // Faucet
-  async claimFaucet(address: string): Promise<{ success: boolean; message: string }> {
-    return this.fetch<{ success: boolean; message: string }>('/faucet', {
+  async claimFaucet(address: string): Promise<{ success: boolean; message: string; amount: number; remainingClaims: number; nextClaimIn: number }> {
+    return this.fetch<{ success: boolean; message: string; amount: number; remainingClaims: number; nextClaimIn: number }>('/faucet', {
       method: 'POST',
       body: JSON.stringify({ address }),
     });
