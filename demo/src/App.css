@@ -1056,3 +1056,81 @@ body {
     gap: 1rem;
   }
 }
+
+/* Danger Button */
+.btn.danger {
+  background: var(--vibe-error);
+  color: white;
+}
+
+.btn.danger:hover {
+  background: #dc2626;
+}
+
+/* Private Key Hidden */
+.private-key-hidden {
+  cursor: pointer;
+  user-select: none;
+}
+
+.private-key-hidden:hover {
+  color: var(--vibe-primary);
+}
+
+/* Faucet Amount Display */
+.faucet-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.faucet-amount .amount {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--vibe-primary);
+}
+
+.faucet-amount .currency {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
+/* Faucet Cooldown */
+.faucet-cooldown {
+  margin-bottom: 1rem;
+}
+
+.faucet-cooldown p {
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+/* Current Balance */
+.current-balance {
+  margin-top: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.current-balance strong {
+  color: var(--vibe-success);
+}
+
+/* Wallet Actions with 3 buttons */
+.wallet-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.wallet-actions .btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Log entry timestamp styling */
+.log-entry {
+  font-size: 0.8rem;
+  word-break: break-word;
+}

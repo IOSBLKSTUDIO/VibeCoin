@@ -1,10 +1,20 @@
-import { useState } from 'react';
-import { Blockchain, Wallet } from './lib/blockchain';
+import { useState, useEffect, useCallback } from 'react';
+import { Blockchain, Wallet, Block } from './lib/blockchain';
 import { ActionCard } from './components/ActionCard';
 import { ValidatorCard } from './components/ValidatorCard';
 import './App.css';
 
-// Simulated Proof of Vibe data (would connect to real API in production)
+// Storage keys
+const STORAGE_KEYS = {
+  WALLET: 'vibecoin_wallet',
+  BLOCKCHAIN: 'vibecoin_blockchain',
+  VALIDATORS: 'vibecoin_validators',
+  VOTED: 'vibecoin_voted',
+  FAUCET_LAST_CLAIM: 'vibecoin_faucet_last',
+  LOGS: 'vibecoin_logs'
+};
+
+// Simulated Proof of Vibe data
 interface Validator {
   address: string;
   name: string;
@@ -18,11 +28,89 @@ interface Validator {
 
 type View = 'home' | 'wallet' | 'validator' | 'vote' | 'explorer' | 'faucet' | 'send';
 
+// Default validators
+const DEFAULT_VALIDATORS: Validator[] = [
+  {
+    address: '04abc123def456789abcdef123456789abcdef123456789abcdef123456789abc',
+    name: 'VibeNode_Genesis',
+    stake: 10000,
+    votes: 5000,
+    vibeScore: 95.5,
+    isActive: true,
+    blocksProduced: 1247,
+    contributionScore: 85
+  },
+  {
+    address: '04def789abc123456def789abc123456def789abc123456def789abc123456def',
+    name: 'CryptoVibe_EU',
+    stake: 7500,
+    votes: 3200,
+    vibeScore: 82.3,
+    isActive: true,
+    blocksProduced: 893,
+    contributionScore: 72
+  },
+  {
+    address: '04ghi321jkl654987ghi321jkl654987ghi321jkl654987ghi321jkl654987ghi',
+    name: 'VibeMaster_Asia',
+    stake: 5000,
+    votes: 2800,
+    vibeScore: 76.8,
+    isActive: true,
+    blocksProduced: 654,
+    contributionScore: 68
+  }
+];
+
 function App() {
-  const [blockchain] = useState(() => new Blockchain());
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+  // Initialize blockchain with localStorage data
+  const [blockchain] = useState<Blockchain>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.BLOCKCHAIN);
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        const bc = new Blockchain();
+        // Restore chain from stored data
+        if (data.chain && data.chain.length > 1) {
+          bc.chain = data.chain.map((blockData: ReturnType<Block['toJSON']>) => Block.fromJSON(blockData));
+        }
+        return bc;
+      } catch (e) {
+        console.warn('Failed to restore blockchain:', e);
+      }
+    }
+    return new Blockchain();
+  });
+
+  // Initialize wallet from localStorage
+  const [wallet, setWallet] = useState<Wallet | null>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.WALLET);
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        return new Wallet(data.privateKey);
+      } catch (e) {
+        console.warn('Failed to restore wallet:', e);
+      }
+    }
+    return null;
+  });
+
   const [currentView, setCurrentView] = useState<View>('home');
-  const [logs, setLogs] = useState<string[]>(['Welcome to VibeCoin!', 'What would you like to do today?']);
+
+  // Initialize logs from localStorage
+  const [logs, setLogs] = useState<string[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOGS);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return ['Welcome back to VibeCoin!'];
+      }
+    }
+    return ['Welcome to VibeCoin!', 'Create a wallet and claim free VIBE from the faucet!'];
+  });
+
   const [, forceUpdate] = useState({});
 
   // Form states
@@ -30,48 +118,105 @@ function App() {
   const [stakeAmount, setStakeAmount] = useState('');
   const [sendRecipient, setSendRecipient] = useState('');
   const [sendAmount, setSendAmount] = useState('');
-  const [faucetAddress, setFaucetAddress] = useState('');
+  const [faucetCooldown, setFaucetCooldown] = useState<string | null>(null);
 
-  // Simulated validators
-  const [validators, setValidators] = useState<Validator[]>([
-    {
-      address: '04abc123def456789...',
-      name: 'VibeNode_Genesis',
-      stake: 10000,
-      votes: 5000,
-      vibeScore: 95.5,
-      isActive: true,
-      blocksProduced: 1247,
-      contributionScore: 85
-    },
-    {
-      address: '04def789abc123456...',
-      name: 'CryptoVibe_EU',
-      stake: 7500,
-      votes: 3200,
-      vibeScore: 82.3,
-      isActive: true,
-      blocksProduced: 893,
-      contributionScore: 72
-    },
-    {
-      address: '04ghi321jkl654987...',
-      name: 'VibeMaster_Asia',
-      stake: 5000,
-      votes: 2800,
-      vibeScore: 76.8,
-      isActive: true,
-      blocksProduced: 654,
-      contributionScore: 68
+  // Initialize validators from localStorage
+  const [validators, setValidators] = useState<Validator[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.VALIDATORS);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return DEFAULT_VALIDATORS;
+      }
     }
-  ]);
+    return DEFAULT_VALIDATORS;
+  });
 
-  const [votedValidators, setVotedValidators] = useState<Set<string>>(new Set());
+  // Initialize voted validators from localStorage
+  const [votedValidators, setVotedValidators] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.VOTED);
+    if (stored) {
+      try {
+        return new Set(JSON.parse(stored));
+      } catch {
+        return new Set();
+      }
+    }
+    return new Set();
+  });
 
-  const refresh = () => forceUpdate({});
+  // Save blockchain to localStorage whenever it changes
+  const saveBlockchain = useCallback(() => {
+    const data = {
+      chain: blockchain.chain.map(b => b.toJSON()),
+      difficulty: blockchain.difficulty,
+      miningReward: blockchain.miningReward
+    };
+    localStorage.setItem(STORAGE_KEYS.BLOCKCHAIN, JSON.stringify(data));
+  }, [blockchain]);
+
+  // Save wallet to localStorage
+  const saveWallet = useCallback((w: Wallet | null) => {
+    if (w) {
+      localStorage.setItem(STORAGE_KEYS.WALLET, JSON.stringify({
+        privateKey: w.privateKey,
+        publicKey: w.publicKey
+      }));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.WALLET);
+    }
+  }, []);
+
+  // Save validators to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.VALIDATORS, JSON.stringify(validators));
+  }, [validators]);
+
+  // Save voted validators to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.VOTED, JSON.stringify([...votedValidators]));
+  }, [votedValidators]);
+
+  // Save logs to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(-50)));
+  }, [logs]);
+
+  // Check faucet cooldown on mount
+  useEffect(() => {
+    checkFaucetCooldown();
+    const interval = setInterval(checkFaucetCooldown, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkFaucetCooldown = () => {
+    const lastClaim = localStorage.getItem(STORAGE_KEYS.FAUCET_LAST_CLAIM);
+    if (lastClaim) {
+      const lastTime = parseInt(lastClaim, 10);
+      const now = Date.now();
+      const cooldown = 60 * 60 * 1000; // 1 hour for demo (would be 24h in production)
+      const remaining = cooldown - (now - lastTime);
+
+      if (remaining > 0) {
+        const minutes = Math.ceil(remaining / 60000);
+        setFaucetCooldown(`${minutes} min`);
+      } else {
+        setFaucetCooldown(null);
+      }
+    } else {
+      setFaucetCooldown(null);
+    }
+  };
+
+  const refresh = () => {
+    forceUpdate({});
+    saveBlockchain();
+  };
 
   const addLog = (msg: string) => {
-    setLogs(prev => [...prev.slice(-20), `${msg}`]);
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs(prev => [...prev.slice(-49), `[${timestamp}] ${msg}`]);
   };
 
   // ==================== WALLET ACTIONS ====================
@@ -79,9 +224,9 @@ function App() {
   const createWallet = () => {
     const newWallet = new Wallet();
     setWallet(newWallet);
+    saveWallet(newWallet);
     addLog(`Wallet created: ${newWallet.getShortAddress()}`);
-    addLog(`Your private key has been generated securely.`);
-    addLog(`Balance: 0 VIBE - Use the faucet to get free testnet VIBE!`);
+    addLog(`Your wallet is saved locally. Use the faucet to get free VIBE!`);
     setCurrentView('home');
   };
 
@@ -89,11 +234,21 @@ function App() {
     try {
       const importedWallet = new Wallet(privateKey);
       setWallet(importedWallet);
+      saveWallet(importedWallet);
+      const balance = importedWallet.getBalance(blockchain);
       addLog(`Wallet imported: ${importedWallet.getShortAddress()}`);
+      addLog(`Balance: ${balance.toFixed(4)} VIBE`);
       setCurrentView('home');
     } catch {
       addLog(`Error: Invalid private key`);
     }
+  };
+
+  const disconnectWallet = () => {
+    setWallet(null);
+    saveWallet(null);
+    addLog('Wallet disconnected');
+    setCurrentView('home');
   };
 
   // ==================== VALIDATOR ACTIONS ====================
@@ -115,6 +270,12 @@ function App() {
       return;
     }
 
+    const balance = wallet.getBalance(blockchain);
+    if (balance < stake) {
+      addLog(`Insufficient balance. You have ${balance.toFixed(4)} VIBE`);
+      return;
+    }
+
     const newValidator: Validator = {
       address: wallet.publicKey,
       name: validatorName,
@@ -128,9 +289,7 @@ function App() {
 
     setValidators(prev => [...prev, newValidator]);
     addLog(`Congratulations! You are now a validator candidate!`);
-    addLog(`Name: ${validatorName}`);
-    addLog(`Stake: ${stake} VIBE`);
-    addLog(`Gather votes from the community to become an active validator.`);
+    addLog(`Name: ${validatorName} | Stake: ${stake} VIBE`);
     setValidatorName('');
     setStakeAmount('');
     setCurrentView('home');
@@ -152,8 +311,8 @@ function App() {
     const validator = validators.find(v => v.address === validatorAddress);
     if (!validator) return;
 
-    // Simulate vote
-    const votePower = Math.min(wallet.getBalance(blockchain) || 100, 1000);
+    const balance = wallet.getBalance(blockchain);
+    const votePower = Math.min(balance || 100, 10000);
 
     setValidators(prev => prev.map(v => {
       if (v.address === validatorAddress) {
@@ -165,8 +324,7 @@ function App() {
     }));
 
     setVotedValidators(prev => new Set([...prev, validatorAddress]));
-    addLog(`You voted for ${validator.name}!`);
-    addLog(`Vote power: ${votePower} VIBE`);
+    addLog(`Voted for ${validator.name}! Vote power: ${votePower.toFixed(0)} VIBE`);
   };
 
   // ==================== TRANSACTION ACTIONS ====================
@@ -193,10 +351,11 @@ function App() {
     const success = wallet.send(blockchain, sendRecipient, amount, 'VibeCoin transfer');
 
     if (success) {
-      addLog(`Transaction sent!`);
-      addLog(`Amount: ${amount} VIBE`);
-      addLog(`To: ${sendRecipient.substring(0, 16)}...`);
-      addLog(`Fee: 0.001 VIBE`);
+      // Mine the transaction immediately for demo
+      blockchain.minePendingTransactions(sendRecipient);
+      saveBlockchain();
+
+      addLog(`Sent ${amount} VIBE to ${sendRecipient.substring(0, 12)}...`);
       setSendRecipient('');
       setSendAmount('');
       setCurrentView('home');
@@ -209,23 +368,37 @@ function App() {
   // ==================== FAUCET ====================
 
   const claimFaucet = () => {
-    const address = faucetAddress || wallet?.publicKey;
-    if (!address) {
-      addLog('Please enter an address or create a wallet');
+    if (!wallet) {
+      addLog('Please create a wallet first!');
       return;
     }
 
-    // Mine a block to simulate faucet (gives mining reward)
-    if (wallet) {
-      blockchain.minePendingTransactions(wallet.publicKey);
-      addLog(`Faucet claimed! +${blockchain.miningReward} VIBE`);
-      addLog(`New balance: ${wallet.getBalance(blockchain).toFixed(4)} VIBE`);
-      setFaucetAddress('');
-      setCurrentView('home');
-      refresh();
-    } else {
-      addLog('Create a wallet first to receive VIBE');
+    // Check cooldown
+    const lastClaim = localStorage.getItem(STORAGE_KEYS.FAUCET_LAST_CLAIM);
+    if (lastClaim) {
+      const lastTime = parseInt(lastClaim, 10);
+      const now = Date.now();
+      const cooldown = 60 * 60 * 1000; // 1 hour cooldown for demo
+      if (now - lastTime < cooldown) {
+        const remaining = Math.ceil((cooldown - (now - lastTime)) / 60000);
+        addLog(`Faucet cooldown: please wait ${remaining} minutes`);
+        return;
+      }
     }
+
+    // Mine a block to give tokens
+    blockchain.minePendingTransactions(wallet.publicKey);
+    saveBlockchain();
+
+    // Record claim time
+    localStorage.setItem(STORAGE_KEYS.FAUCET_LAST_CLAIM, Date.now().toString());
+    checkFaucetCooldown();
+
+    const newBalance = wallet.getBalance(blockchain);
+    addLog(`Faucet claimed! +${blockchain.miningReward} VIBE`);
+    addLog(`New balance: ${newBalance.toFixed(4)} VIBE`);
+    setCurrentView('home');
+    refresh();
   };
 
   // ==================== RENDER FUNCTIONS ====================
@@ -234,7 +407,7 @@ function App() {
     <div className="home-view">
       <div className="greeting">
         <h2>What would you like to do?</h2>
-        <p className="subtitle">Choose an action below or tell us what you need</p>
+        <p className="subtitle">Your data is saved locally in your browser</p>
       </div>
 
       <div className="action-grid">
@@ -280,8 +453,9 @@ function App() {
         <ActionCard
           icon="🚿"
           title="Testnet Faucet"
-          description="Get free VIBE for testing"
+          description={faucetCooldown ? `Cooldown: ${faucetCooldown}` : "Get free VIBE for testing"}
           onClick={() => setCurrentView('faucet')}
+          highlight={!faucetCooldown && !!wallet}
         />
 
         <ActionCard
@@ -384,9 +558,21 @@ function App() {
             </div>
 
             <div className="detail-item">
-              <label>Private Key</label>
+              <label>Private Key (click to reveal)</label>
               <div className="address-field">
-                <code>••••••••••••••••••••••••••••••••</code>
+                <code
+                  className="private-key-hidden"
+                  onClick={(e) => {
+                    const el = e.target as HTMLElement;
+                    if (el.classList.contains('private-key-hidden')) {
+                      el.textContent = wallet.privateKey;
+                      el.classList.remove('private-key-hidden');
+                    } else {
+                      el.textContent = '••••••••••••••••••••••••••••••••';
+                      el.classList.add('private-key-hidden');
+                    }
+                  }}
+                >••••••••••••••••••••••••••••••••</code>
                 <button
                   className="copy-btn"
                   onClick={() => {
@@ -406,6 +592,9 @@ function App() {
             </button>
             <button className="btn secondary" onClick={() => setCurrentView('faucet')}>
               Get Free VIBE
+            </button>
+            <button className="btn danger" onClick={disconnectWallet}>
+              Disconnect
             </button>
           </div>
         </div>
@@ -480,7 +669,7 @@ function App() {
       <h2>🗳️ Vote for Validators</h2>
       <p className="view-description">
         Support validators you trust. Your vote power is based on your VIBE balance (max 10,000).
-        You can vote for up to 10 validators.
+        {wallet && ` Your vote power: ${Math.min(wallet.getBalance(blockchain), 10000).toFixed(0)} VIBE`}
       </p>
 
       <div className="validators-list">
@@ -557,7 +746,7 @@ function App() {
                 </div>
                 <div className="detail">
                   <span className="label">Consensus</span>
-                  <span className="consensus-badge">{(block as { consensusType?: string }).consensusType || 'PoW'}</span>
+                  <span className="consensus-badge">PoV</span>
                 </div>
               </div>
               {block.transactions.length > 0 && (
@@ -565,7 +754,7 @@ function App() {
                   {block.transactions.map((tx, i) => (
                     <div key={i} className="tx-item">
                       <span className="tx-from">
-                        {tx.from === 'MINING_REWARD' ? '⛏️ Mining' :
+                        {tx.from === 'MINING_REWARD' ? '⛏️ Faucet' :
                          tx.from === 'GENESIS' ? '🌟 Genesis' :
                          tx.from.substring(0, 8) + '...'}
                       </span>
@@ -589,8 +778,7 @@ function App() {
 
       <h2>🚿 Testnet Faucet</h2>
       <p className="view-description">
-        Get free VIBE tokens for testing on the testnet.
-        {wallet ? ' Click below to claim your tokens!' : ' Create a wallet first to receive tokens.'}
+        Get free VIBE tokens for testing. Claim {blockchain.miningReward} VIBE every hour!
       </p>
 
       <div className="faucet-container">
@@ -602,24 +790,37 @@ function App() {
               <label>Your Address</label>
               <code>{wallet.getShortAddress()}</code>
             </div>
-            <button className="btn primary large" onClick={claimFaucet}>
-              Claim {blockchain.miningReward} VIBE
-            </button>
+
+            <div className="faucet-amount">
+              <span className="amount">{blockchain.miningReward}</span>
+              <span className="currency">VIBE</span>
+            </div>
+
+            {faucetCooldown ? (
+              <div className="faucet-cooldown">
+                <p>Next claim available in: <strong>{faucetCooldown}</strong></p>
+                <button className="btn secondary large" disabled>
+                  Cooldown Active
+                </button>
+              </div>
+            ) : (
+              <button className="btn primary large" onClick={claimFaucet}>
+                Claim {blockchain.miningReward} VIBE
+              </button>
+            )}
+
+            <p className="current-balance">
+              Current balance: <strong>{wallet.getBalance(blockchain).toFixed(4)} VIBE</strong>
+            </p>
           </>
         ) : (
           <>
             <div className="form-group">
-              <label>Enter Address</label>
-              <input
-                type="text"
-                placeholder="Your VibeCoin address"
-                value={faucetAddress}
-                onChange={(e) => setFaucetAddress(e.target.value)}
-                className="input-field"
-              />
+              <label>Create a wallet first</label>
+              <p>You need a wallet to receive VIBE tokens</p>
             </div>
-            <button className="btn secondary" onClick={() => setCurrentView('wallet')}>
-              Create Wallet First
+            <button className="btn primary large" onClick={() => setCurrentView('wallet')}>
+              Create Wallet
             </button>
           </>
         )}
@@ -715,9 +916,9 @@ function App() {
       </main>
 
       <aside className="activity-log">
-        <h4>Activity</h4>
+        <h4>Activity Log</h4>
         <div className="log-entries">
-          {logs.map((log, i) => (
+          {logs.slice(-15).map((log, i) => (
             <div key={i} className="log-entry">{log}</div>
           ))}
         </div>
