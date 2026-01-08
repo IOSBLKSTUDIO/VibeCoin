@@ -3,6 +3,8 @@ import { api } from './api';
 import type { NodeInfo, Block } from './api';
 import { API_URL, TOKEN, REFRESH_INTERVAL } from './config';
 import { exportWalletToFile, importWalletFromFile } from './crypto';
+import { RewardsPanel } from './RewardsPanel';
+import { initStreakState, updateMissionProgress, initMissionsState, saveMissionsState } from './rewards';
 import './App.css';
 
 type View = 'chat' | 'explorer' | 'wallet' | 'whitepaper';
@@ -149,6 +151,16 @@ function App() {
   const [language, setLanguage] = useState<Language | null>(null);
   const t = language ? translations[language] : translations.en;
 
+  // Rewards state
+  const [showRewards, setShowRewards] = useState(false);
+  const [streakCount, setStreakCount] = useState(0);
+
+  // Load streak count on mount
+  useEffect(() => {
+    const streak = initStreakState();
+    setStreakCount(streak.currentStreak);
+  }, []);
+
   // Load wallet, language and chat history from localStorage
   useEffect(() => {
     const storedWallet = localStorage.getItem(WALLET_STORAGE_KEY);
@@ -268,6 +280,26 @@ function App() {
     return message;
   };
 
+  // Track mission progress
+  const trackMission = (action: string) => {
+    const missions = initMissionsState();
+    const { state: newState, completed } = updateMissionProgress(missions, action);
+    saveMissionsState(newState);
+    if (completed) {
+      const missionName = language === 'fr' ? completed.titleFr : completed.title;
+      addMessage('system', language === 'fr'
+        ? `🎉 Mission complétée : "${missionName}" ! Ouvre les Récompenses pour réclamer +${completed.reward} VIBE`
+        : `🎉 Mission completed: "${missionName}"! Open Rewards to claim +${completed.reward} VIBE`);
+    }
+  };
+
+  // Handle reward earned
+  const handleRewardEarned = (amount: number, reason: string) => {
+    addMessage('system', language === 'fr'
+      ? `🎁 +${amount} VIBE gagné : ${reason}`
+      : `🎁 +${amount} VIBE earned: ${reason}`);
+  };
+
   // Parse and execute natural language commands
   const processCommand = async (input: string) => {
     const lowerInput = input.toLowerCase().trim();
@@ -383,6 +415,7 @@ function App() {
       try {
         const result = await api.claimFaucet(wallet.publicKey);
         setTimeout(fetchBalance, 2000);
+        trackMission('faucet'); // Track faucet mission
         return t.faucetSuccess(result.message, result.remainingClaims, result.nextClaimIn);
       } catch (error: any) {
         try {
@@ -404,6 +437,7 @@ function App() {
       }
 
       await fetchBalance();
+      trackMission('balance'); // Track balance mission
       return t.balance(balance, wallet.publicKey.substring(0, 24));
     }
 
@@ -439,6 +473,7 @@ function App() {
       try {
         await api.sendTransaction(wallet.publicKey, toAddress, amount, wallet.privateKey);
         setTimeout(fetchBalance, 2000);
+        trackMission('send'); // Track send mission
         return t.sendSuccess(amount, toAddress.substring(0, 16));
       } catch (error: any) {
         return t.sendFailed(error.message);
@@ -458,6 +493,7 @@ function App() {
         response += `• Block #${block.index}: ${block.transactions.length} tx, nonce ${block.nonce.toLocaleString()}\n`;
       });
 
+      trackMission('blocks'); // Track blocks mission
       return response;
     }
 
@@ -663,6 +699,14 @@ function App() {
             {wallet && (
               <span className="chat-balance">{balance.toFixed(2)} VIBE</span>
             )}
+            <button
+              className="rewards-btn"
+              onClick={() => setShowRewards(true)}
+              title={language === 'fr' ? 'Récompenses' : 'Rewards'}
+            >
+              🎁 {language === 'fr' ? 'Récompenses' : 'Rewards'}
+              {streakCount > 0 && <span className="streak-badge">🔥{streakCount}</span>}
+            </button>
             <button
               className="language-toggle"
               onClick={() => selectLanguage(language === 'en' ? 'fr' : 'en')}
@@ -1063,6 +1107,17 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Rewards Panel */}
+      {language && (
+        <RewardsPanel
+          language={language}
+          walletAddress={wallet?.publicKey || null}
+          onRewardEarned={handleRewardEarned}
+          isVisible={showRewards}
+          onClose={() => setShowRewards(false)}
+        />
+      )}
     </div>
   );
 }
