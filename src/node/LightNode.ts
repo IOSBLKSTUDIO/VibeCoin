@@ -18,8 +18,13 @@
  */
 
 import WebSocket, { WebSocketServer } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { Block } from '../core/Block';
+
+// Generate UUID v4 using native crypto (avoids ESM/CommonJS issues with uuid package)
+function uuidv4(): string {
+  return crypto.randomUUID();
+}
 import { Transaction } from '../core/Transaction';
 import {
   getSeedNodes,

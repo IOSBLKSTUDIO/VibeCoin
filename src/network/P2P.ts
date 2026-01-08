@@ -8,8 +8,13 @@
  * Eco-friendly: Uses Proof of Vibe instead of energy-intensive mining
  */
 import WebSocket, { WebSocketServer } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { Blockchain } from '../core/Blockchain';
+
+// Generate UUID v4 using native crypto (avoids ESM/CommonJS issues with uuid package)
+function uuidv4(): string {
+  return crypto.randomUUID();
+}
 import { Block } from '../core/Block';
 import { Transaction } from '../core/Transaction';
 import { Storage } from '../storage/Storage';
