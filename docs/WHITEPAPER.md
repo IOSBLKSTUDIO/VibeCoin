@@ -302,14 +302,93 @@ const isValid = verify(publicKey, signature, transactionData);
 | Sybil Attack | Fake multiple identities | PoW makes identity creation costly |
 | Eclipse Attack | Isolate node from network | Peer diversity, multiple connections |
 | Replay Attack | Reuse valid transaction | Unique transaction IDs |
+| DDoS Attack | Flood node with requests | Rate limiting, auto-ban |
+| Invalid Block Injection | Send malicious blocks | ChainValidator + peer scoring |
+
+### P2P Network Security
+
+VibeCoin implements a comprehensive P2P security system to protect against network attacks:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    P2P SECURITY LAYERS                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Layer 1: CONNECTION CONTROL                                   │
+│   ├── Max 3 connections per IP                                  │
+│   ├── Max 5 connection attempts per minute                      │
+│   └── Banned IPs are rejected immediately                       │
+│                                                                  │
+│   Layer 2: RATE LIMITING                                        │
+│   ├── Max 10 messages per second per peer                       │
+│   ├── Max 1MB message size                                      │
+│   └── Spammers get score penalties                              │
+│                                                                  │
+│   Layer 3: PEER SCORING                                         │
+│   ├── Valid block:       +1 point                               │
+│   ├── Valid transaction: +0.5 point                             │
+│   ├── Invalid block:     -5 points                              │
+│   ├── Invalid tx:        -2 points                              │
+│   ├── Protocol violation: -3 points                             │
+│   └── Spam message:      -1 point                               │
+│                                                                  │
+│   Layer 4: AUTOMATIC BANNING                                    │
+│   ├── Score < -10 = 24 hour ban                                 │
+│   ├── Banned peers disconnected immediately                     │
+│   └── Ban expires automatically                                 │
+│                                                                  │
+│   Layer 5: CHAIN VALIDATION                                     │
+│   ├── Consensus rules (immutable)                               │
+│   ├── Checkpoints (hardcoded block hashes)                      │
+│   └── Block structure validation                                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Security Configuration:**
+```typescript
+const SECURITY_CONFIG = {
+  MAX_MESSAGES_PER_SECOND: 10,
+  MAX_CONNECTIONS_PER_IP: 3,
+  MAX_MESSAGE_SIZE: 1024 * 1024,  // 1MB
+  BAN_DURATION_MS: 24 * 60 * 60 * 1000,  // 24 hours
+  BAN_THRESHOLD_SCORE: -10
+};
+```
+
+### ChainValidator: Immutable Consensus Rules
+
+Even the creators cannot cheat. The ChainValidator enforces rules that are hardcoded into every node:
+
+```typescript
+// These rules cannot be changed without ALL nodes updating
+const CONSENSUS_RULES = {
+  MAX_SUPPLY: 21_000_000,           // Never more than 21M VIBE
+  INITIAL_BLOCK_REWARD: 50,         // Starting reward
+  HALVING_INTERVAL: 210_000,        // Blocks between halvings
+  MAX_BLOCK_SIZE: 1_000_000,        // 1MB max block
+  MAX_TRANSACTIONS_PER_BLOCK: 5000  // Transaction limit
+};
+```
+
+**Checkpoints**: Hardcoded block hashes that nodes must match:
+```typescript
+// If a node has different hashes at these heights, it's rejected
+const CHECKPOINTS = {
+  0: "genesis_block_hash...",    // Genesis
+  1000: "block_1000_hash...",    // First checkpoint
+  // More added as network grows
+};
+```
 
 ### Current Security Status
 
 | Aspect | Testnet Status | Production Requirement |
 |--------|---------------|------------------------|
-| Nodes | 1 (local) | 100+ independent |
-| Network | localhost | Global Internet |
-| Miners | Single | Distributed community |
+| Nodes | Distributed | 100+ independent |
+| Network | Global Internet | Global Internet |
+| Miners | Community | Distributed community |
+| DDoS Protection | Rate limiting + banning | Rate limiting + banning |
 | Value | 0€ (test) | Real economic value |
 | Audits | None | Professional security audit |
 
@@ -395,6 +474,44 @@ const BLOCKCHAIN_CONFIG = {
 
 ## Network Protocol
 
+### Decentralized Architecture
+
+VibeCoin uses a fully decentralized P2P network, similar to Bitcoin:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    VIBECOIN NETWORK                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│     ┌────────┐         ┌────────┐         ┌────────┐           │
+│     │ Seed   │◄───────►│ Cloud  │◄───────►│ Home   │           │
+│     │ Node   │         │ Node   │         │ Node   │           │
+│     │(Render)│         │(Heroku)│         │ (Mac)  │           │
+│     └────┬───┘         └────┬───┘         └────┬───┘           │
+│          │                  │                  │                │
+│          │    ┌─────────────┴─────────────┐    │                │
+│          │    │                           │    │                │
+│          ▼    ▼                           ▼    ▼                │
+│     ┌────────┐         ┌────────┐         ┌────────┐           │
+│     │ User   │◄───────►│ Miner  │◄───────►│ User   │           │
+│     │ Node   │         │ Node   │         │ Node   │           │
+│     │ (PC)   │         │(Linux) │         │(Light) │           │
+│     └────────┘         └────────┘         └────────┘           │
+│                                                                  │
+│     Every node is equal. No central authority.                  │
+│     If one goes down, the network continues.                    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Node Types
+
+| Type | Storage | Mining | Use Case |
+|------|---------|--------|----------|
+| **Full Node** | Complete blockchain | Yes | Mining, validation |
+| **Light Node** | Headers only (~99% less) | No | Wallet, transactions |
+| **Seed Node** | Complete blockchain | Optional | Network bootstrap |
+
 ### P2P Communication
 
 VibeCoin uses WebSocket for peer-to-peer communication:
@@ -411,11 +528,40 @@ enum MessageType {
   HANDSHAKE = 'HANDSHAKE',
   NEW_BLOCK = 'NEW_BLOCK',
   NEW_TRANSACTION = 'NEW_TRANSACTION',
-  REQUEST_CHAIN = 'REQUEST_CHAIN',
-  CHAIN_RESPONSE = 'CHAIN_RESPONSE',
-  PEERS_REQUEST = 'PEERS_REQUEST',
-  PEERS_RESPONSE = 'PEERS_RESPONSE'
+  SYNC_REQUEST = 'SYNC_REQUEST',
+  SYNC_RESPONSE = 'SYNC_RESPONSE',
+  GET_PEERS = 'GET_PEERS',
+  PEERS = 'PEERS',
+  NODE_ANNOUNCE = 'NODE_ANNOUNCE'
 }
+```
+
+### Peer Discovery
+
+Like Bitcoin, VibeCoin uses multiple methods to find peers:
+
+1. **Seed Nodes**: Well-known, always-online nodes for initial bootstrap
+2. **Peer Exchange**: Connected nodes share their peer lists
+3. **Fallback Peers**: Hardcoded IPs when seed nodes are unreachable
+
+```typescript
+// Seed nodes by network
+const SEED_NODES = {
+  testnet: [
+    'vibecoin-testnet.onrender.com',  // Cloud seed
+    'testnet1.vibecoin.network:6001'  // DNS seed
+  ],
+  mainnet: [
+    'seed1.vibecoin.network:6001',
+    'seed2.vibecoin.network:6001',
+    'seed3.vibecoin.network:6001'
+  ]
+};
+
+// Hardcoded fallbacks (like Bitcoin)
+const FALLBACK_PEERS = [
+  'vibecoin-testnet.onrender.com'
+];
 ```
 
 ### Chain Synchronization
@@ -425,13 +571,39 @@ Node A (new)              Node B (existing)
     │                           │
     │──── HANDSHAKE ──────────►│
     │◄─── HANDSHAKE ───────────│
+    │     (height: 0)      (height: 500)
     │                           │
-    │──── REQUEST_CHAIN ──────►│
-    │◄─── CHAIN_RESPONSE ──────│
+    │──── SYNC_REQUEST ───────►│
+    │     (from: 0, to: 500)    │
     │                           │
-    │     [Validates chain]     │
-    │     [Replaces if longer]  │
+    │◄─── SYNC_RESPONSE ───────│
+    │     (blocks 0-99)         │
     │                           │
+    │     [Validates each block]│
+    │     [Checks ChainValidator]│
+    │                           │
+    │──── SYNC_REQUEST ───────►│
+    │     (from: 100, to: 500)  │
+    │◄─── SYNC_RESPONSE ───────│
+    │     (blocks 100-199)      │
+    │          ...              │
+    │                           │
+    │     ✅ Synced to 500!     │
+```
+
+### Cloud Mode (Render, Heroku)
+
+For cloud platforms that only expose one port, VibeCoin supports attaching P2P WebSocket to the HTTP server:
+
+```
+Traditional Mode:              Cloud Mode:
+┌─────────────────┐           ┌─────────────────┐
+│ API  → Port 3000│           │ API  → Port 3000│
+│ P2P  → Port 6001│           │ P2P  → Port 3000/p2p│
+└─────────────────┘           └─────────────────┘
+
+# Cloud users connect via:
+wss://your-app.onrender.com/p2p
 ```
 
 ### REST API Endpoints

@@ -247,6 +247,36 @@ node dist/cli.js --mine --miner "your-saved-private-key" --network testnet
 
 The node will sync with the network and your balance will be restored automatically.
 
+### Become a Public Node Host
+
+Want to help decentralize VibeCoin? Host a public node accessible to everyone!
+
+```bash
+# One-command setup
+./scripts/setup-public-node.sh
+
+# Then just start your node
+./scripts/start-node.sh
+```
+
+The script handles everything: wallet creation, configuration, and provides clear instructions for port forwarding.
+
+**[Complete Hosting Guide (FR)](docs/HOSTING_A_PUBLIC_NODE.md)**
+
+### Network Security
+
+VibeCoin includes automatic protection against attacks:
+
+| Protection | Description |
+|------------|-------------|
+| Rate Limiting | Max 10 messages/second per peer |
+| Connection Limits | Max 3 connections per IP |
+| Auto-Ban | Bad actors banned for 24 hours |
+| Chain Validation | Immutable consensus rules |
+| Peer Scoring | +1 valid block, -5 invalid block |
+
+**Nobody can cheat** - not even the creators. Every node validates every block independently.
+
 ### Full Documentation
 
 For complete setup guide, cloud deployment, and troubleshooting:
@@ -416,6 +446,36 @@ node dist/cli.js --mine --miner "votre-clé-privée-sauvegardée" --network test
 ```
 
 Le nœud se synchronisera avec le réseau et votre solde sera restauré automatiquement.
+
+### Devenir Hébergeur de Nœud Public
+
+Vous voulez aider à décentraliser VibeCoin ? Hébergez un nœud public accessible à tous !
+
+```bash
+# Configuration en une commande
+./scripts/setup-public-node.sh
+
+# Puis lancez votre nœud
+./scripts/start-node.sh
+```
+
+Le script gère tout : création du wallet, configuration, et fournit des instructions claires pour le port forwarding.
+
+**[Guide Complet d'Hébergement](docs/HOSTING_A_PUBLIC_NODE.md)**
+
+### Sécurité du Réseau
+
+VibeCoin inclut une protection automatique contre les attaques :
+
+| Protection | Description |
+|------------|-------------|
+| Rate Limiting | Max 10 messages/seconde par peer |
+| Limite Connexions | Max 3 connexions par IP |
+| Bannissement Auto | Mauvais acteurs bannis 24h |
+| Validation Chaîne | Règles de consensus immuables |
+| Score Pairs | +1 bloc valide, -5 bloc invalide |
+
+**Personne ne peut tricher** - même pas les créateurs. Chaque nœud valide chaque bloc indépendamment.
 
 ### Documentation Complète
 

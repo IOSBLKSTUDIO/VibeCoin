@@ -27,6 +27,7 @@ import {
   calculatePeerScore
 } from './SeedNodes';
 import { ChainValidator } from '../core/ChainValidator';
+import { p2pSecurity, SECURITY_CONFIG } from './P2PSecurity';
 
 // Version for protocol compatibility
 const PROTOCOL_VERSION = '1.0.0';
@@ -201,6 +202,7 @@ export class P2PNetwork {
     // New block announcement
     this.messageHandlers.set(MessageType.NEW_BLOCK, async (peer, data) => {
       const block = Block.fromJSON(data.block);
+      const peerIP = this.extractIP(peer.address);
 
       if (this.isValidNewBlock(block)) {
         this.blockchain.chain.push(block);
@@ -213,17 +215,24 @@ export class P2PNetwork {
         await this.storage.saveBlockchain(this.blockchain);
         console.log(`📦 New block ${block.index} from ${peer.nodeId.substring(0, 8)}`);
 
+        // Reward good behavior
+        p2pSecurity.reportValidBlock(peerIP);
+
         // Broadcast to other peers
         this.broadcastExcept(peer.nodeId, {
           type: MessageType.NEW_BLOCK,
           data: { block: block.toJSON() }
         });
+      } else {
+        // Punish bad behavior
+        p2pSecurity.reportInvalidBlock(peerIP);
       }
     });
 
     // New transaction announcement
     this.messageHandlers.set(MessageType.NEW_TRANSACTION, (peer, data) => {
       const tx = Transaction.fromJSON(data.transaction);
+      const peerIP = this.extractIP(peer.address);
 
       if (tx.isValid()) {
         const exists = this.blockchain.pendingTransactions.some(t => t.id === tx.id);
@@ -232,12 +241,19 @@ export class P2PNetwork {
           this.blockchain.addTransaction(tx);
           console.log(`📝 New transaction from ${peer.nodeId.substring(0, 8)}`);
 
+          // Reward good behavior
+          p2pSecurity.reportValidTransaction(peerIP);
+
           // Broadcast to other peers
           this.broadcastExcept(peer.nodeId, {
             type: MessageType.NEW_TRANSACTION,
             data: { transaction: tx.toJSON() }
           });
         }
+      } else {
+        // Punish bad behavior
+        p2pSecurity.reportInvalidTransaction(peerIP);
+        console.log(`⚠️ Invalid transaction from ${peer.nodeId.substring(0, 8)}`);
       }
     });
 
@@ -310,14 +326,17 @@ export class P2PNetwork {
     // Sync response - receiving blocks during sync
     this.messageHandlers.set(MessageType.SYNC_RESPONSE, async (peer, data) => {
       const { blocks, hasMore, totalHeight } = data;
+      const peerIP = this.extractIP(peer.address);
 
       for (const blockData of blocks) {
         const block = Block.fromJSON(blockData);
         if (this.isValidNewBlock(block)) {
           this.blockchain.chain.push(block);
           peer.score.blocksReceived++;
+          p2pSecurity.reportValidBlock(peerIP);
         } else {
           peer.score.invalidBlocks++;
+          p2pSecurity.reportInvalidBlock(peerIP);
         }
       }
 
@@ -531,9 +550,35 @@ export class P2PNetwork {
   }
 
   /**
+   * Extract IP from address (removes port)
+   */
+  private extractIP(address: string): string {
+    // Handle various formats: "192.168.1.1:6001", "::ffff:192.168.1.1:6001", "localhost:6001"
+    const cleaned = address.replace(/^::ffff:/, '');
+    const colonIndex = cleaned.lastIndexOf(':');
+    if (colonIndex > 0) {
+      return cleaned.substring(0, colonIndex);
+    }
+    return cleaned;
+  }
+
+  /**
    * Handle new connection
    */
   private handleConnection(ws: WebSocket, address: string, isOutbound: boolean): void {
+    const ip = this.extractIP(address);
+
+    // Security check: Can this IP connect?
+    const connectionCheck = p2pSecurity.canConnect(ip);
+    if (!connectionCheck.allowed) {
+      console.log(`🚫 Connection rejected from ${ip}: ${connectionCheck.reason}`);
+      ws.close(1008, connectionCheck.reason);  // 1008 = Policy Violation
+      return;
+    }
+
+    // Track this connection
+    p2pSecurity.trackConnection(ip);
+
     const peer: Peer = {
       ws,
       nodeId: '',
@@ -561,7 +606,24 @@ export class P2PNetwork {
 
     ws.on('message', (data) => {
       try {
-        const message: P2PMessage = JSON.parse(data.toString());
+        const rawMessage = data.toString();
+
+        // Security: Validate message size
+        const sizeCheck = p2pSecurity.validateMessageSize(rawMessage);
+        if (!sizeCheck.valid) {
+          console.log(`⚠️ Message rejected from ${ip}: ${sizeCheck.reason}`);
+          p2pSecurity.reportProtocolViolation(ip, 'Message too large');
+          return;
+        }
+
+        // Security: Rate limiting
+        const rateCheck = p2pSecurity.checkRateLimit(ip);
+        if (!rateCheck.allowed) {
+          // Already logged and scored in checkRateLimit
+          return;
+        }
+
+        const message: P2PMessage = JSON.parse(rawMessage);
         const handler = this.messageHandlers.get(message.type);
 
         if (handler) {
@@ -569,18 +631,21 @@ export class P2PNetwork {
         }
       } catch (error) {
         console.error('Invalid message from peer');
+        p2pSecurity.reportProtocolViolation(ip, 'Malformed message');
       }
     });
 
     ws.on('close', () => {
       peer.connected = false;
       this.peers.delete(address);
+      p2pSecurity.trackDisconnection(ip);
       console.log(`✂️ Peer disconnected: ${address}`);
     });
 
     ws.on('error', () => {
       peer.connected = false;
       this.peers.delete(address);
+      p2pSecurity.trackDisconnection(ip);
     });
 
     // Send handshake with enhanced info
@@ -732,6 +797,9 @@ export class P2PNetwork {
       .map(p => p.address);
 
     await this.storage.savePeers(addresses);
+
+    // Clean up old security data
+    p2pSecurity.cleanup();
   }
 
   /**
@@ -790,6 +858,41 @@ export class P2PNetwork {
    */
   getNodeId(): string {
     return this.nodeId;
+  }
+
+  /**
+   * Get security statistics
+   */
+  getSecurityStats(): object {
+    return p2pSecurity.getStats();
+  }
+
+  /**
+   * Get list of banned peers
+   */
+  getBannedPeers(): Array<{ ip: string; reason: string; expiresAt: number }> {
+    return p2pSecurity.getBannedPeers();
+  }
+
+  /**
+   * Manually ban a peer
+   */
+  banPeer(ip: string, reason: string): void {
+    p2pSecurity.banPeer(ip, reason);
+    // Also disconnect if currently connected
+    for (const [address, peer] of this.peers) {
+      if (this.extractIP(address) === ip && peer.connected) {
+        peer.ws.close(1008, 'Banned');
+        this.peers.delete(address);
+      }
+    }
+  }
+
+  /**
+   * Manually unban a peer
+   */
+  unbanPeer(ip: string): boolean {
+    return p2pSecurity.unbanPeer(ip);
   }
 
   /**
