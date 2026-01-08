@@ -1,0 +1,25 @@
+{
+  "name": "vibecoin",
+  "version": "0.1.0",
+  "description": "VibeCoin - Altcoin project dedicated to the crypto universe and vibeCoding",
+  "main": "index.js",
+  "scripts": {
+    "node": "node blockchain/index.js",
+    "wallet": "node wallet/index.js",
+    "mine": "node mining/index.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "blockchain",
+    "cryptocurrency",
+    "altcoin",
+    "vibecoding",
+    "crypto"
+  ],
+  "author": "BLKSTUDIO",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IOSBLKSTUDIO/VibeCoin.git"
+  }
+}
