@@ -1089,24 +1089,44 @@ body {
 }
 
 .chat-input-form .import-btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+  border: 2px solid var(--success);
+  color: var(--success);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  position: relative;
+}
+
+.chat-input-form .import-btn::after {
+  content: 'Import';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.chat-input-form .import-btn:hover::after {
+  opacity: 1;
 }
 
 .chat-input-form .import-btn:hover:not(:disabled) {
-  border-color: var(--vibe-primary);
-  color: var(--vibe-primary);
-  background: rgba(139, 92, 246, 0.1);
+  border-color: var(--success);
+  color: white;
+  background: var(--success);
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
 }
 
 .chat-input-form .import-btn:disabled {
@@ -1213,6 +1233,81 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* ==================== QUICK ACTIONS ==================== */
+.quick-actions {
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.quick-actions-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.quick-actions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.quick-action-btn:hover:not(:disabled) {
+  border-color: var(--vibe-primary);
+  color: var(--vibe-primary);
+  background: rgba(139, 92, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+.quick-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quick-action-icon {
+  font-size: 14px;
+}
+
+.quick-action-label {
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .quick-actions {
+    padding: 10px 12px;
+  }
+
+  .quick-actions-grid {
+    gap: 6px;
+  }
+
+  .quick-action-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .quick-action-icon {
+    font-size: 12px;
+  }
 }
 
 .chat-header-left {

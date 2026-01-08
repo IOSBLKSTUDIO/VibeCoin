@@ -607,6 +607,45 @@ function App() {
     </div>
   );
 
+  // Quick action buttons for the chat
+  const quickActions = language === 'fr' ? [
+    { label: 'Créer un wallet', command: 'Crée-moi un wallet', icon: '👛' },
+    { label: 'Mon solde', command: 'Quel est mon solde ?', icon: '💰' },
+    { label: 'Obtenir des VIBE', command: 'Donne-moi des VIBE', icon: '🎁' },
+    { label: 'Mon adresse', command: 'Quelle est mon adresse ?', icon: '📋' },
+    { label: 'Voir les blocs', command: 'Montre-moi les derniers blocs', icon: '📦' },
+    { label: 'État du réseau', command: 'Quel est l\'état du réseau ?', icon: '🌐' },
+    { label: 'Exporter wallet', command: 'exporter wallet', icon: '💾' },
+    { label: 'Restaurer wallet', command: 'restaurer', icon: '🔄' },
+  ] : [
+    { label: 'Create wallet', command: 'Create a wallet for me', icon: '👛' },
+    { label: 'My balance', command: 'What\'s my balance?', icon: '💰' },
+    { label: 'Get VIBE', command: 'Give me some VIBE', icon: '🎁' },
+    { label: 'My address', command: 'What\'s my address?', icon: '📋' },
+    { label: 'View blocks', command: 'Show me the latest blocks', icon: '📦' },
+    { label: 'Network status', command: 'What\'s the network status?', icon: '🌐' },
+    { label: 'Export wallet', command: 'export wallet', icon: '💾' },
+    { label: 'Restore wallet', command: 'restore', icon: '🔄' },
+  ];
+
+  const handleQuickAction = async (command: string) => {
+    if (isProcessing) return;
+
+    addMessage('user', command);
+    setIsProcessing(true);
+
+    try {
+      const response = await processCommand(command);
+      if (response) {
+        addMessage('system', response);
+      }
+    } catch (error) {
+      addMessage('system', t.error);
+    }
+
+    setIsProcessing(false);
+  };
+
   const renderChat = () => {
     // Show language selection if not set
     if (!language) {
@@ -631,6 +670,26 @@ function App() {
             >
               {language === 'en' ? '🇫🇷' : '🇬🇧'}
             </button>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="quick-actions">
+          <div className="quick-actions-label">
+            {language === 'fr' ? 'Actions rapides :' : 'Quick actions:'}
+          </div>
+          <div className="quick-actions-grid">
+            {quickActions.map((action, index) => (
+              <button
+                key={index}
+                className="quick-action-btn"
+                onClick={() => handleQuickAction(action.command)}
+                disabled={isProcessing}
+              >
+                <span className="quick-action-icon">{action.icon}</span>
+                <span className="quick-action-label">{action.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
