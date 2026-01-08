@@ -1,25 +1,43 @@
 {
   "name": "vibecoin",
   "version": "0.1.0",
-  "description": "VibeCoin - Altcoin project dedicated to the crypto universe and vibeCoding",
-  "main": "index.js",
+  "description": "VibeCoin - The cryptocurrency born from the VibeCoding movement",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "node": "node blockchain/index.js",
-    "wallet": "node wallet/index.js",
-    "mine": "node mining/index.js",
-    "test": "jest"
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "demo": "npm run build && node dist/index.js",
+    "test": "jest",
+    "clean": "rm -rf dist"
   },
   "keywords": [
     "blockchain",
     "cryptocurrency",
     "altcoin",
     "vibecoding",
-    "crypto"
+    "crypto",
+    "web3",
+    "defi"
   ],
   "author": "BLKSTUDIO",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/IOSBLKSTUDIO/VibeCoin.git"
+    "url": "git+https://github.com/IOSBLKSTUDIO/VibeCoin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/IOSBLKSTUDIO/VibeCoin/issues"
+  },
+  "homepage": "https://github.com/IOSBLKSTUDIO/VibeCoin#readme",
+  "dependencies": {
+    "elliptic": "^6.6.1"
+  },
+  "devDependencies": {
+    "@types/elliptic": "^6.4.18",
+    "@types/node": "^25.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
