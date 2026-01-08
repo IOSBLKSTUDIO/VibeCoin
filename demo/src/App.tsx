@@ -1,401 +1,362 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { api } from './api';
+import type { NodeInfo, Block } from './api';
+import { API_URL, TOKEN, REFRESH_INTERVAL } from './config';
 import './App.css';
 
-type View = 'home' | 'whitepaper' | 'roadmap' | 'wallet-preview';
+type View = 'explorer' | 'wallet' | 'whitepaper';
+
+// Storage key for wallet
+const WALLET_STORAGE_KEY = 'vibecoin_wallet';
+
+interface StoredWallet {
+  address: string;
+  publicKey: string;
+  privateKey: string;
+}
 
 function App() {
-  const [currentView, setCurrentView] = useState<View>('home');
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
+  const [currentView, setCurrentView] = useState<View>('explorer');
+  const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [isOnline, setIsOnline] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
+  // Wallet state
+  const [wallet, setWallet] = useState<StoredWallet | null>(null);
+  const [balance, setBalance] = useState<number>(0);
+  const [walletLoading, setWalletLoading] = useState<boolean>(false);
+  const [faucetMessage, setFaucetMessage] = useState<string>('');
+
+  // Load wallet from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(WALLET_STORAGE_KEY);
+    if (stored) {
+      try {
+        setWallet(JSON.parse(stored));
+      } catch (e) {
+        console.error('Failed to load wallet:', e);
+      }
     }
+  }, []);
+
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    try {
+      const [info, blocksData] = await Promise.all([
+        api.getInfo(),
+        api.getBlocks(20, 0)
+      ]);
+
+      setNodeInfo(info);
+      setBlocks(blocksData.blocks.reverse()); // Latest first
+      setIsOnline(true);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      setIsOnline(false);
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch balance
+  const fetchBalance = useCallback(async () => {
+    if (!wallet) return;
+    try {
+      const balanceData = await api.getBalance(wallet.publicKey);
+      setBalance(balanceData.balance);
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+    }
+  }, [wallet]);
+
+  // Initial fetch and polling
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Fetch balance when wallet changes
+  useEffect(() => {
+    if (wallet) {
+      fetchBalance();
+      const interval = setInterval(fetchBalance, REFRESH_INTERVAL);
+      return () => clearInterval(interval);
+    }
+  }, [wallet, fetchBalance]);
+
+  // Create new wallet
+  const createWallet = async () => {
+    setWalletLoading(true);
+    try {
+      const newWallet = await api.createWallet();
+      const walletData: StoredWallet = {
+        address: newWallet.address,
+        publicKey: newWallet.publicKey,
+        privateKey: newWallet.privateKey || ''
+      };
+      setWallet(walletData);
+      localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(walletData));
+      setFaucetMessage('');
+    } catch (error) {
+      console.error('Failed to create wallet:', error);
+    }
+    setWalletLoading(false);
   };
 
-  const renderHome = () => (
-    <>
-      {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-bg">
-          <div className="hero-gradient"></div>
-          <div className="hero-grid"></div>
+  // Claim faucet
+  const claimFaucet = async () => {
+    if (!wallet) return;
+    setWalletLoading(true);
+    try {
+      const result = await api.claimFaucet(wallet.publicKey);
+      setFaucetMessage(result.message);
+      // Refresh balance after a delay (wait for mining)
+      setTimeout(fetchBalance, 2000);
+    } catch (error: any) {
+      setFaucetMessage(error.message || 'Failed to claim faucet');
+    }
+    setWalletLoading(false);
+  };
+
+  // Format timestamp
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  // Format hash for display
+  const shortHash = (hash: string) => {
+    return `${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`;
+  };
+
+  // Format address
+  const shortAddress = (addr: string) => {
+    if (!addr || addr === 'coinbase') return 'COINBASE';
+    return `${addr.substring(0, 8)}...${addr.substring(addr.length - 6)}`;
+  };
+
+  const renderExplorer = () => (
+    <div className="explorer">
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-icon blocks-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18"/>
+              <path d="M3 15h18"/>
+              <path d="M9 3v18"/>
+              <path d="M15 3v18"/>
+            </svg>
+          </div>
+          <div className="stat-info">
+            <span className="stat-value">{nodeInfo?.blocks || 0}</span>
+            <span className="stat-label">Blocks</span>
+          </div>
         </div>
 
-        <div className="hero-content">
-          <div className="hero-badge">
-            <span className="badge-dot"></span>
-            Testnet Coming Soon
+        <div className="stat-card">
+          <div className="stat-icon supply-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v12"/>
+              <path d="M15 9.5c-.5-1-1.5-1.5-3-1.5s-2.5.5-3 1.5c-.5 1 0 2 1.5 2.5s3 1 3 2.5c0 1-1 2-2.5 2s-2.5-.5-3-1.5"/>
+            </svg>
+          </div>
+          <div className="stat-info">
+            <span className="stat-value">{nodeInfo?.circulatingSupply?.toFixed(0) || 0}</span>
+            <span className="stat-label">VIBE Minted</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon tx-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2v20"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div className="stat-info">
+            <span className="stat-value">{nodeInfo?.pendingTransactions || 0}</span>
+            <span className="stat-label">Pending TX</span>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon difficulty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div className="stat-info">
+            <span className="stat-value">{nodeInfo?.difficulty || 0}</span>
+            <span className="stat-label">Difficulty</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Blocks List */}
+      <div className="blocks-section">
+        <div className="section-header">
+          <h2>Recent Blocks</h2>
+          <span className="live-badge">
+            <span className="live-dot"></span>
+            Live
+          </span>
+        </div>
+
+        <div className="blocks-list">
+          {blocks.map((block) => (
+            <div
+              key={block.index}
+              className={`block-card ${selectedBlock?.index === block.index ? 'selected' : ''}`}
+              onClick={() => setSelectedBlock(selectedBlock?.index === block.index ? null : block)}
+            >
+              <div className="block-header">
+                <div className="block-number">
+                  <span className="block-label">Block</span>
+                  <span className="block-index">#{block.index}</span>
+                </div>
+                <div className="block-time">{formatTime(block.timestamp)}</div>
+              </div>
+
+              <div className="block-details">
+                <div className="block-hash">
+                  <span className="hash-label">Hash</span>
+                  <code className="hash-value">{shortHash(block.hash)}</code>
+                </div>
+                <div className="block-meta">
+                  <span className="meta-item">
+                    <strong>{block.transactions.length}</strong> tx
+                  </span>
+                  <span className="meta-item">
+                    nonce: <strong>{block.nonce.toLocaleString()}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Expanded block details */}
+              {selectedBlock?.index === block.index && (
+                <div className="block-expanded">
+                  <div className="expanded-row">
+                    <span className="expanded-label">Full Hash</span>
+                    <code className="expanded-value">{block.hash}</code>
+                  </div>
+                  <div className="expanded-row">
+                    <span className="expanded-label">Previous Hash</span>
+                    <code className="expanded-value">{block.previousHash}</code>
+                  </div>
+
+                  {block.transactions.length > 0 && (
+                    <div className="block-transactions">
+                      <h4>Transactions</h4>
+                      {block.transactions.map((tx) => (
+                        <div key={tx.id} className="tx-item">
+                          <div className="tx-parties">
+                            <span className="tx-from">{shortAddress(tx.from)}</span>
+                            <span className="tx-arrow">→</span>
+                            <span className="tx-to">{shortAddress(tx.to)}</span>
+                          </div>
+                          <span className="tx-amount">{tx.amount} VIBE</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderWallet = () => (
+    <div className="wallet-page">
+      {!wallet ? (
+        <div className="wallet-create">
+          <div className="wallet-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="M22 10H18a2 2 0 0 0 0 4h4"/>
+              <circle cx="18" cy="12" r="1"/>
+            </svg>
+          </div>
+          <h2>Create Your Wallet</h2>
+          <p>Get started with VibeCoin by creating a new testnet wallet.</p>
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={createWallet}
+            disabled={walletLoading || !isOnline}
+          >
+            {walletLoading ? 'Creating...' : 'Create Wallet'}
+          </button>
+          {!isOnline && (
+            <p className="offline-warning">Node is offline. Please wait...</p>
+          )}
+        </div>
+      ) : (
+        <div className="wallet-dashboard">
+          <div className="wallet-balance-card">
+            <span className="balance-label">Your Balance</span>
+            <div className="balance-amount">
+              <span className="balance-value">{balance.toFixed(2)}</span>
+              <span className="balance-symbol">VIBE</span>
+            </div>
           </div>
 
-          <h1 className="hero-title">
-            <span className="title-line">Code with Feeling.</span>
-            <span className="title-line">Build with Passion.</span>
-            <span className="title-line gradient-text">Create with Vibes.</span>
-          </h1>
-
-          <p className="hero-description">
-            VibeCoin is the first cryptocurrency born from the <strong>VibeCoding</strong> movement.
-            A revolutionary digital asset where creativity, community, and code converge.
-          </p>
-
-          <div className="hero-actions">
-            <button className="btn btn-primary btn-lg" onClick={() => setCurrentView('whitepaper')}>
-              <span>Read Whitepaper</span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
+          <div className="wallet-address-card">
+            <span className="address-label">Your Address</span>
+            <code className="address-value">{wallet.publicKey}</code>
+            <button
+              className="copy-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(wallet.publicKey);
+              }}
+            >
+              Copy
             </button>
-            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-              </svg>
-              <span>View on GitHub</span>
-            </a>
           </div>
+
+          <div className="wallet-actions">
+            <div className="faucet-card">
+              <h3>Testnet Faucet</h3>
+              <p>Get free testnet VIBE to try the network.</p>
+              <button
+                className="btn btn-secondary"
+                onClick={claimFaucet}
+                disabled={walletLoading || !isOnline}
+              >
+                {walletLoading ? 'Claiming...' : 'Claim 100 VIBE'}
+              </button>
+              {faucetMessage && (
+                <p className="faucet-message">{faucetMessage}</p>
+              )}
+            </div>
+          </div>
+
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={() => {
+              if (confirm('Are you sure? This will delete your wallet.')) {
+                localStorage.removeItem(WALLET_STORAGE_KEY);
+                setWallet(null);
+                setBalance(0);
+              }
+            }}
+          >
+            Delete Wallet
+          </button>
         </div>
-
-        <div className="hero-visual">
-          <div className="coin-container">
-            <div className="coin">
-              <div className="coin-face coin-front">
-                <span className="coin-symbol">V</span>
-              </div>
-              <div className="coin-face coin-back">
-                <span className="coin-symbol">VIBE</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testnet Status Section */}
-      <section className="status-section">
-        <div className="container">
-          <div className="status-card">
-            <div className="status-header">
-              <h2>Testnet Status</h2>
-              <span className="status-badge preparing">Preparing Launch</span>
-            </div>
-
-            <div className="status-grid">
-              <div className="status-item">
-                <div className="status-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M3 9h18"/>
-                  </svg>
-                </div>
-                <div className="status-info">
-                  <span className="status-label">Blocks</span>
-                  <span className="status-value coming-soon">--</span>
-                </div>
-              </div>
-
-              <div className="status-item">
-                <div className="status-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
-                </div>
-                <div className="status-info">
-                  <span className="status-label">Validators</span>
-                  <span className="status-value coming-soon">--</span>
-                </div>
-              </div>
-
-              <div className="status-item">
-                <div className="status-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                  </svg>
-                </div>
-                <div className="status-info">
-                  <span className="status-label">Total Staked</span>
-                  <span className="status-value coming-soon">--</span>
-                </div>
-              </div>
-
-              <div className="status-item">
-                <div className="status-icon pov">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                  </svg>
-                </div>
-                <div className="status-info">
-                  <span className="status-label">Consensus</span>
-                  <span className="status-value gradient-text">Proof of Vibe</span>
-                </div>
-              </div>
-            </div>
-
-            <p className="status-note">
-              The VibeCoin testnet is currently in development. Join the waitlist to be notified when we launch.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="features-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Built Different</h2>
-            <p>VibeCoin reimagines what a cryptocurrency can be</p>
-          </div>
-
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🎯</span>
-              </div>
-              <h3>Proof of Vibe</h3>
-              <p>
-                Our unique consensus mechanism rewards creators, not just capital.
-                Stake, vote, and contribute to earn.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🗳️</span>
-              </div>
-              <h3>Democratic Governance</h3>
-              <p>
-                Community-driven validator selection. Your voice matters.
-                Vote for validators you trust.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>⚡</span>
-              </div>
-              <h3>Fast & Efficient</h3>
-              <p>
-                10-second block times. Low fees. No energy-intensive mining.
-                Built for the future.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🌱</span>
-              </div>
-              <h3>Sustainable</h3>
-              <p>
-                Eco-friendly by design. No proof-of-work mining means minimal
-                environmental impact.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🔓</span>
-              </div>
-              <h3>Open Source</h3>
-              <p>
-                Fully transparent. Review the code, contribute, and help shape
-                the future of VibeCoin.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon">
-                <span>🎨</span>
-              </div>
-              <h3>Creator Economy</h3>
-              <p>
-                Reward developers, artists, and educators.
-                Contribution is valued and incentivized.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Tokenomics Section */}
-      <section className="tokenomics-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Tokenomics</h2>
-            <p>Designed for sustainability and fair distribution</p>
-          </div>
-
-          <div className="tokenomics-grid">
-            <div className="token-stat">
-              <span className="token-value">VIBE</span>
-              <span className="token-label">Symbol</span>
-            </div>
-            <div className="token-stat">
-              <span className="token-value">21M</span>
-              <span className="token-label">Max Supply</span>
-            </div>
-            <div className="token-stat">
-              <span className="token-value">~10s</span>
-              <span className="token-label">Block Time</span>
-            </div>
-            <div className="token-stat">
-              <span className="token-value">8</span>
-              <span className="token-label">Decimals</span>
-            </div>
-          </div>
-
-          <div className="distribution-card">
-            <h3>Initial Distribution</h3>
-            <div className="distribution-bars">
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Community Rewards</span>
-                  <span>60%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '60%'}}></div>
-                </div>
-              </div>
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Development Fund</span>
-                  <span>15%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '15%'}}></div>
-                </div>
-              </div>
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Team & Founders</span>
-                  <span>15%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '15%'}}></div>
-                </div>
-              </div>
-              <div className="distribution-item">
-                <div className="distribution-header">
-                  <span>Reserve</span>
-                  <span>10%</span>
-                </div>
-                <div className="distribution-bar">
-                  <div className="distribution-fill" style={{width: '10%'}}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Roadmap Preview */}
-      <section className="roadmap-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Roadmap</h2>
-            <p>Our journey to revolutionize crypto</p>
-          </div>
-
-          <div className="roadmap-timeline">
-            <div className="roadmap-item active">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 1</span>
-                <h4>Foundation</h4>
-                <p>Core blockchain development, wallet implementation, testnet preparation</p>
-                <span className="roadmap-status">In Progress</span>
-              </div>
-            </div>
-
-            <div className="roadmap-item">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 2</span>
-                <h4>Growth</h4>
-                <p>Testnet launch, smart contracts, web & mobile wallets</p>
-                <span className="roadmap-status upcoming">Upcoming</span>
-              </div>
-            </div>
-
-            <div className="roadmap-item">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 3</span>
-                <h4>Ecosystem</h4>
-                <p>DAO governance, creator rewards program, partnerships</p>
-                <span className="roadmap-status upcoming">Upcoming</span>
-              </div>
-            </div>
-
-            <div className="roadmap-item">
-              <div className="roadmap-marker"></div>
-              <div className="roadmap-content">
-                <span className="roadmap-phase">Phase 4</span>
-                <h4>Mainstream</h4>
-                <p>Mainnet launch, exchange listings, NFT marketplace</p>
-                <span className="roadmap-status upcoming">Upcoming</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="container">
-          <div className="cta-card">
-            <h2>Be Part of the Vibe</h2>
-            <p>Join the waitlist to get notified when the testnet launches and receive early access.</p>
-
-            {subscribed ? (
-              <div className="subscribed-message">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                <span>You're on the list! We'll notify you when we launch.</span>
-              </div>
-            ) : (
-              <form className="subscribe-form" onSubmit={handleSubscribe}>
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <button type="submit" className="btn btn-primary">
-                  Join Waitlist
-                </button>
-              </form>
-            )}
-
-            <div className="social-links">
-              <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="social-link">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
+      )}
+    </div>
   );
 
   const renderWhitepaper = () => (
     <section className="page-section">
       <div className="container">
-        <button className="back-btn" onClick={() => setCurrentView('home')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to Home
-        </button>
-
         <article className="whitepaper-content">
           <h1>VibeCoin Whitepaper</h1>
           <p className="subtitle">The Cryptocurrency Born from VibeCoding</p>
@@ -445,13 +406,13 @@ function App() {
             <h2>Technical Specifications</h2>
             <table className="specs-table">
               <tbody>
-                <tr><td>Symbol</td><td>VIBE</td></tr>
-                <tr><td>Total Supply</td><td>21,000,000</td></tr>
+                <tr><td>Symbol</td><td>{TOKEN.symbol}</td></tr>
+                <tr><td>Total Supply</td><td>{TOKEN.maxSupply.toLocaleString()}</td></tr>
                 <tr><td>Block Time</td><td>~10 seconds</td></tr>
                 <tr><td>Consensus</td><td>Proof of Vibe (PoV)</td></tr>
                 <tr><td>Max Validators</td><td>21</td></tr>
                 <tr><td>Minimum Stake</td><td>100 VIBE</td></tr>
-                <tr><td>Decimals</td><td>8</td></tr>
+                <tr><td>Decimals</td><td>{TOKEN.decimals}</td></tr>
               </tbody>
             </table>
           </section>
@@ -473,28 +434,71 @@ function App() {
     </section>
   );
 
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="loading-screen">
+          <div className="loading-spinner"></div>
+          <p>Connecting to VibeCoin Testnet...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="header">
         <div className="container header-content">
-          <div className="logo" onClick={() => setCurrentView('home')}>
+          <div className="logo" onClick={() => setCurrentView('explorer')}>
             <div className="logo-icon">
               <span>⚡</span>
             </div>
             <span className="logo-text">VibeCoin</span>
+            <span className="network-badge">Testnet</span>
           </div>
 
           <nav className="nav">
-            <button className="nav-link" onClick={() => setCurrentView('whitepaper')}>Whitepaper</button>
-            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="nav-link">GitHub</a>
-            <span className="nav-badge">Testnet Soon</span>
+            <button
+              className={`nav-link ${currentView === 'explorer' ? 'active' : ''}`}
+              onClick={() => setCurrentView('explorer')}
+            >
+              Explorer
+            </button>
+            <button
+              className={`nav-link ${currentView === 'wallet' ? 'active' : ''}`}
+              onClick={() => setCurrentView('wallet')}
+            >
+              Wallet
+            </button>
+            <button
+              className={`nav-link ${currentView === 'whitepaper' ? 'active' : ''}`}
+              onClick={() => setCurrentView('whitepaper')}
+            >
+              Whitepaper
+            </button>
+            <a
+              href="https://github.com/IOSBLKSTUDIO/VibeCoin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nav-link"
+            >
+              GitHub
+            </a>
           </nav>
+
+          <div className={`status-indicator ${isOnline ? 'online' : 'offline'}`}>
+            <span className="status-dot"></span>
+            <span className="status-text">{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
         </div>
       </header>
 
       <main className="main">
-        {currentView === 'home' && renderHome()}
-        {currentView === 'whitepaper' && renderWhitepaper()}
+        <div className="container">
+          {currentView === 'explorer' && renderExplorer()}
+          {currentView === 'wallet' && renderWallet()}
+          {currentView === 'whitepaper' && renderWhitepaper()}
+        </div>
       </main>
 
       <footer className="footer">
@@ -505,9 +509,9 @@ function App() {
           </div>
           <p className="footer-tagline">Code with feeling. Build with passion. Create with vibes.</p>
           <div className="footer-links">
-            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span>API: {API_URL}</span>
             <span className="divider">•</span>
-            <span>MIT License</span>
+            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer">GitHub</a>
             <span className="divider">•</span>
             <span>Built by BLKSTUDIO</span>
           </div>
