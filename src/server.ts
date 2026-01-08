@@ -52,17 +52,19 @@ if (MINER_PRIVATE_KEY) {
   try {
     minerWallet = new Wallet(MINER_PRIVATE_KEY);
     console.log(`⛏️  Restored Miner Wallet: ${minerWallet.publicKey.substring(0, 32)}...`);
+    console.log(`   ✅ Wallet loaded from MINER_PRIVATE_KEY environment variable`);
   } catch {
     console.log(`⚠️  Invalid MINER_PRIVATE_KEY, creating new wallet`);
     minerWallet = new Wallet();
     console.log(`⛏️  New Miner Address: ${minerWallet.publicKey.substring(0, 32)}...`);
-    console.log(`   💡 Set MINER_PRIVATE_KEY env var to persist: ${minerWallet.getPrivateKey()}`);
+    console.log(`   ⚠️  SECURITY: Set MINER_PRIVATE_KEY in your environment variables (NOT in logs!)`);
   }
 } else {
   minerWallet = new Wallet();
   console.log(`⛏️  New Miner Address: ${minerWallet.publicKey.substring(0, 32)}...`);
   console.log(`   ⚠️  No MINER_PRIVATE_KEY set - wallet will change on restart`);
-  console.log(`   💡 To persist, set MINER_PRIVATE_KEY=${minerWallet.getPrivateKey()}`);
+  console.log(`   💡 To persist your wallet, set MINER_PRIVATE_KEY environment variable`);
+  console.log(`   📖 See docs/SECURITY.md for secure key management`);
 }
 console.log('');
 
