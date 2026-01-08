@@ -1,9 +1,12 @@
 import * as crypto from 'crypto';
 import { Transaction } from './Transaction';
 
+export type ConsensusType = 'PoW' | 'PoV';
+
 /**
  * Block - The fundamental unit of the VibeCoin blockchain
  * Each block contains transactions and is linked to the previous block via hash
+ * Supports both Proof of Work (PoW) and Proof of Vibe (PoV) consensus
  */
 export class Block {
   public index: number;
@@ -15,12 +18,21 @@ export class Block {
   public difficulty: number;
   public miner: string;
 
+  // Proof of Vibe fields
+  public consensusType: ConsensusType;
+  public validator: string;         // Validator address (PoV)
+  public validatorName: string;     // Validator name (PoV)
+  public vibeScore: number;         // Validator's vibe score when block was produced
+  public signature: string;         // Validator's signature (PoV)
+  public epoch: number;             // Epoch number (PoV)
+
   constructor(
     index: number,
     transactions: Transaction[],
     previousHash: string,
     difficulty: number = 4,
-    miner: string = ''
+    miner: string = '',
+    consensusType: ConsensusType = 'PoW'
   ) {
     this.index = index;
     this.timestamp = Date.now();
@@ -29,6 +41,12 @@ export class Block {
     this.difficulty = difficulty;
     this.miner = miner;
     this.nonce = 0;
+    this.consensusType = consensusType;
+    this.validator = '';
+    this.validatorName = '';
+    this.vibeScore = 0;
+    this.signature = '';
+    this.epoch = 0;
     this.hash = this.calculateHash();
   }
 
@@ -42,7 +60,11 @@ export class Block {
       transactions: this.transactions.map(tx => tx.toJSON()),
       previousHash: this.previousHash,
       nonce: this.nonce,
-      miner: this.miner
+      miner: this.miner,
+      consensusType: this.consensusType,
+      validator: this.validator,
+      vibeScore: this.vibeScore,
+      epoch: this.epoch
     });
 
     return crypto.createHash('sha256').update(data).digest('hex');
@@ -86,10 +108,19 @@ export class Block {
       return false;
     }
 
-    // Check if hash meets difficulty requirement
-    const target = '0'.repeat(this.difficulty);
-    if (this.hash.substring(0, this.difficulty) !== target) {
-      return false;
+    // Consensus-specific validation
+    if (this.consensusType === 'PoW') {
+      // Check if hash meets difficulty requirement
+      const target = '0'.repeat(this.difficulty);
+      if (this.hash.substring(0, this.difficulty) !== target) {
+        return false;
+      }
+    } else if (this.consensusType === 'PoV') {
+      // For PoV, check that validator is set
+      if (!this.validator) {
+        return false;
+      }
+      // Note: Signature verification would be done by the consensus layer
     }
 
     // Validate all transactions
@@ -100,6 +131,44 @@ export class Block {
     }
 
     return true;
+  }
+
+  /**
+   * Set Proof of Vibe validator info
+   */
+  setValidator(
+    validatorAddress: string,
+    validatorName: string,
+    vibeScore: number,
+    epoch: number
+  ): void {
+    this.consensusType = 'PoV';
+    this.validator = validatorAddress;
+    this.validatorName = validatorName;
+    this.vibeScore = vibeScore;
+    this.epoch = epoch;
+    this.hash = this.calculateHash();
+  }
+
+  /**
+   * Sign the block (for PoV)
+   */
+  sign(signature: string): void {
+    this.signature = signature;
+  }
+
+  /**
+   * Check if block uses Proof of Vibe
+   */
+  isPoV(): boolean {
+    return this.consensusType === 'PoV';
+  }
+
+  /**
+   * Check if block uses Proof of Work
+   */
+  isPoW(): boolean {
+    return this.consensusType === 'PoW';
   }
 
   /**
@@ -121,7 +190,13 @@ export class Block {
       hash: this.hash,
       nonce: this.nonce,
       difficulty: this.difficulty,
-      miner: this.miner
+      miner: this.miner,
+      consensusType: this.consensusType,
+      validator: this.validator,
+      validatorName: this.validatorName,
+      vibeScore: this.vibeScore,
+      signature: this.signature,
+      epoch: this.epoch
     };
   }
 
@@ -134,11 +209,18 @@ export class Block {
       data.transactions.map((tx: any) => Transaction.fromJSON(tx)),
       data.previousHash,
       data.difficulty,
-      data.miner
+      data.miner,
+      data.consensusType || 'PoW'
     );
     block.timestamp = data.timestamp;
     block.nonce = data.nonce;
     block.hash = data.hash;
+    // PoV fields
+    block.validator = data.validator || '';
+    block.validatorName = data.validatorName || '';
+    block.vibeScore = data.vibeScore || 0;
+    block.signature = data.signature || '';
+    block.epoch = data.epoch || 0;
     return block;
   }
 

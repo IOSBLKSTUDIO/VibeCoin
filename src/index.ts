@@ -4,12 +4,25 @@
  */
 
 // Core
-export { Block } from './core/Block';
+export { Block, ConsensusType } from './core/Block';
 export { Transaction } from './core/Transaction';
 export { Blockchain, BLOCKCHAIN_CONFIG } from './core/Blockchain';
 
 // Wallet
 export { Wallet } from './wallet/Wallet';
+
+// Consensus - Proof of Vibe
+export {
+  ProofOfVibe,
+  PoVConfig,
+  DEFAULT_POV_CONFIG,
+  StakingManager,
+  StakeInfo,
+  VotingManager,
+  ValidatorManager,
+  ValidatorInfo,
+  VibeScore
+} from './consensus';
 
 // Storage
 export { Storage, StorageConfig } from './storage/Storage';
