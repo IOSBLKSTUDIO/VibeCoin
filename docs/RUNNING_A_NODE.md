@@ -216,6 +216,181 @@ To minimize your environmental impact:
 - Use light mode: `--light`
 - Change data directory: `--data /path/with/space`
 
+## Wallet Management
+
+### Creating a Wallet
+
+When you start mining, a new wallet is automatically created:
+
+```bash
+node dist/cli.js --mine --miner new --network testnet
+```
+
+You'll see output like:
+```
+🔑 New Miner Wallet Created
+   Address: 04a1b2c3d4...
+   Private Key: 5Kb8kLf9zgWQnOgU...
+
+⚠️  SAVE YOUR PRIVATE KEY! This is the ONLY way to restore your wallet.
+```
+
+### Backing Up Your Wallet
+
+**CRITICAL**: Your private key is the ONLY thing you need to backup.
+
+Save it somewhere secure:
+- Password manager (recommended)
+- Encrypted file
+- Written on paper in a safe
+
+**Never share your private key with anyone!**
+
+### Restoring Your Wallet
+
+You can restore your wallet on any computer, anytime:
+
+```bash
+# Use your saved private key
+node dist/cli.js --mine --miner "5Kb8kLf9zgWQnOgU..." --network testnet
+```
+
+Your VIBE balance is stored in the blockchain, not on your computer. When you restore:
+1. The node connects to the network
+2. Downloads the latest blockchain from peers
+3. Your balance is automatically calculated from the blockchain
+
+**Even if years pass and millions of blocks are mined, your VIBE are safe as long as you have your private key.**
+
+## How Synchronization Works
+
+### First Start (No Local Blockchain)
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│   Your Node     │         │   Other Nodes   │
+│   (Height: 0)   │◀───────▶│   (Height: 500) │
+└─────────────────┘         └─────────────────┘
+        │                           │
+        │    1. Connect to peers    │
+        │◀─────────────────────────▶│
+        │                           │
+        │    2. Request blocks      │
+        │─────────────────────────▶ │
+        │                           │
+        │    3. Receive & validate  │
+        │◀───────────────────────── │
+        │                           │
+        ▼                           │
+┌─────────────────┐                 │
+│   Your Node     │                 │
+│   (Height: 500) │ ← Synced!       │
+└─────────────────┘                 │
+```
+
+### Restart (With Local Blockchain)
+
+If your node has blockchain data saved locally:
+1. Loads blockchain from disk (instant)
+2. Connects to peers
+3. Downloads only NEW blocks since last run
+4. Continues normally
+
+### What Gets Synchronized
+
+| Data | Synced? | Details |
+|------|---------|---------|
+| Blocks | ✅ Yes | All blocks from genesis to latest |
+| Transactions | ✅ Yes | Included in blocks |
+| Balances | ✅ Yes | Calculated from transactions |
+| Pending TX | ✅ Yes | Shared between connected nodes |
+| Your Private Key | ❌ No | Never shared, never leaves your device |
+
+## Cloud Deployment (Render, Heroku, etc.)
+
+### The Challenge
+
+Cloud platforms like Render use **ephemeral storage** - your data is lost on each deployment.
+
+### Solution: Environment Variables
+
+Set these in your cloud dashboard:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `MINER_PRIVATE_KEY` | Your wallet private key | `5Kb8kLf9zgWQn...` |
+| `SEED_PEERS` | Nodes to sync from | `192.168.1.10:6001` |
+| `PORT` | API port | `3000` |
+| `P2P_PORT` | P2P port | `6001` |
+
+### Render.com Setup
+
+1. Create a new Web Service
+2. Connect your GitHub repo
+3. Set build command: `npm install && npm run build`
+4. Set start command: `npm run start`
+5. Add environment variables:
+   - `MINER_PRIVATE_KEY` = your private key
+   - `SEED_PEERS` = ip:port of your home node (optional)
+
+### Recommended Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    VibeCoin Network                      │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│   ┌─────────────┐              ┌─────────────┐          │
+│   │  Your Home  │◀────────────▶│   Render    │          │
+│   │  Mac/PC     │   P2P Sync   │   Server    │          │
+│   │  (24/7)     │              │             │          │
+│   │             │              │             │          │
+│   │  Primary    │              │  Secondary  │          │
+│   │  Storage    │              │  + API      │          │
+│   └─────────────┘              └─────────────┘          │
+│         ▲                            ▲                   │
+│         │                            │                   │
+│         ▼                            ▼                   │
+│   ┌─────────────┐              ┌─────────────┐          │
+│   │  Other      │              │  Other      │          │
+│   │  Users      │              │  Users      │          │
+│   └─────────────┘              └─────────────┘          │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Your home node** = Primary source of truth (persistent storage)
+**Render** = Public API + backup node (syncs from home node)
+**Other users** = Sync from any available node
+
+### Port Forwarding for Home Node
+
+To let Render (or other nodes) connect to your home node:
+
+1. Find your public IP: `curl ifconfig.me`
+2. Open port 6001 on your router (forward to your Mac/PC)
+3. Set `SEED_PEERS=your-public-ip:6001` on Render
+
+**Dynamic IP?** Use a free dynamic DNS:
+- [DuckDNS](https://duckdns.org) - Free, simple
+- [No-IP](https://noip.com) - Free tier available
+
+Then use: `SEED_PEERS=mynode.duckdns.org:6001`
+
+## Security Best Practices
+
+### DO ✅
+- Save your private key in a secure location
+- Use environment variables for sensitive data
+- Keep your node software updated
+- Use HTTPS for public APIs
+
+### DON'T ❌
+- Share your private key with anyone
+- Commit private keys to Git
+- Run as root/administrator
+- Expose your node without firewall
+
 ## Community
 
 - **GitHub**: https://github.com/IOSBLKSTUDIO/VibeCoin
