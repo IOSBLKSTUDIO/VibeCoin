@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VibeCoin Wallet</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Loading State -->
+    <div id="loading" class="view">
+      <div class="logo-container">
+        <span class="logo-icon">⚡</span>
+        <h1>VibeCoin</h1>
+      </div>
+      <div class="loader"></div>
+    </div>
+
+    <!-- Welcome / Create Wallet -->
+    <div id="welcome" class="view hidden">
+      <div class="logo-container">
+        <span class="logo-icon">⚡</span>
+        <h1>VibeCoin Wallet</h1>
+      </div>
+      <p class="tagline">Your gateway to the Vibe ecosystem</p>
+
+      <div class="welcome-actions">
+        <button id="btn-create" class="btn primary">
+          Create New Wallet
+        </button>
+        <button id="btn-import" class="btn secondary">
+          Import Wallet
+        </button>
+      </div>
+
+      <p class="network-badge">Testnet</p>
+    </div>
+
+    <!-- Import Wallet -->
+    <div id="import-view" class="view hidden">
+      <div class="header">
+        <button id="btn-back-import" class="back-btn">←</button>
+        <h2>Import Wallet</h2>
+      </div>
+
+      <div class="form-container">
+        <div class="form-group">
+          <label>Private Key</label>
+          <textarea id="import-key" placeholder="Enter your private key" rows="3"></textarea>
+        </div>
+        <button id="btn-do-import" class="btn primary full-width">
+          Import
+        </button>
+      </div>
+    </div>
+
+    <!-- Set Password (after create/import) -->
+    <div id="password-view" class="view hidden">
+      <div class="header">
+        <h2>Set Password</h2>
+      </div>
+
+      <p class="description">Create a password to encrypt your wallet locally.</p>
+
+      <div class="form-container">
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="Enter password">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="password-confirm" placeholder="Confirm password">
+        </div>
+        <button id="btn-set-password" class="btn primary full-width">
+          Create Wallet
+        </button>
+      </div>
+    </div>
+
+    <!-- Unlock Wallet -->
+    <div id="unlock-view" class="view hidden">
+      <div class="logo-container small">
+        <span class="logo-icon">⚡</span>
+        <h1>VibeCoin</h1>
+      </div>
+
+      <div class="form-container">
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="unlock-password" placeholder="Enter your password">
+        </div>
+        <p id="unlock-error" class="error hidden">Incorrect password</p>
+        <button id="btn-unlock" class="btn primary full-width">
+          Unlock
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Wallet View -->
+    <div id="main-view" class="view hidden">
+      <div class="wallet-header">
+        <div class="wallet-info">
+          <span class="network-tag">Testnet</span>
+          <button id="btn-settings" class="icon-btn">⚙️</button>
+        </div>
+      </div>
+
+      <div class="balance-card">
+        <p class="balance-label">Balance</p>
+        <h1 class="balance-amount"><span id="balance">0.0000</span> <span class="currency">VIBE</span></h1>
+        <p class="balance-usd" id="balance-usd">≈ $0.00 USD</p>
+      </div>
+
+      <div class="address-section">
+        <p class="address-label">Your Address</p>
+        <div class="address-box">
+          <code id="address">Loading...</code>
+          <button id="btn-copy" class="copy-btn" title="Copy address">📋</button>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button id="btn-send" class="action-btn">
+          <span class="action-icon">↑</span>
+          <span>Send</span>
+        </button>
+        <button id="btn-receive" class="action-btn">
+          <span class="action-icon">↓</span>
+          <span>Receive</span>
+        </button>
+        <button id="btn-faucet" class="action-btn highlight">
+          <span class="action-icon">💧</span>
+          <span>Faucet</span>
+        </button>
+        <button id="btn-stake" class="action-btn">
+          <span class="action-icon">🔐</span>
+          <span>Stake</span>
+        </button>
+      </div>
+
+      <div class="transactions-section">
+        <h3>Recent Activity</h3>
+        <div id="transactions" class="tx-list">
+          <p class="empty-state">No transactions yet</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send View -->
+    <div id="send-view" class="view hidden">
+      <div class="header">
+        <button id="btn-back-send" class="back-btn">←</button>
+        <h2>Send VIBE</h2>
+      </div>
+
+      <div class="form-container">
+        <div class="balance-mini">
+          Available: <strong><span id="send-balance">0</span> VIBE</strong>
+        </div>
+
+        <div class="form-group">
+          <label>Recipient Address</label>
+          <input type="text" id="send-to" placeholder="Enter recipient address">
+        </div>
+
+        <div class="form-group">
+          <label>Amount (VIBE)</label>
+          <input type="number" id="send-amount" placeholder="0.00" step="0.0001" min="0">
+          <button id="btn-max" class="max-btn">MAX</button>
+        </div>
+
+        <div class="fee-info">
+          <span>Network Fee</span>
+          <span>0.001 VIBE</span>
+        </div>
+
+        <button id="btn-confirm-send" class="btn primary full-width">
+          Send Transaction
+        </button>
+      </div>
+    </div>
+
+    <!-- Receive View -->
+    <div id="receive-view" class="view hidden">
+      <div class="header">
+        <button id="btn-back-receive" class="back-btn">←</button>
+        <h2>Receive VIBE</h2>
+      </div>
+
+      <div class="receive-container">
+        <div id="qr-code" class="qr-placeholder">
+          <span class="qr-icon">📱</span>
+        </div>
+
+        <p class="receive-label">Your VibeCoin Address</p>
+        <div class="address-box large">
+          <code id="receive-address">Loading...</code>
+        </div>
+        <button id="btn-copy-receive" class="btn secondary full-width">
+          Copy Address
+        </button>
+      </div>
+    </div>
+
+    <!-- Faucet View -->
+    <div id="faucet-view" class="view hidden">
+      <div class="header">
+        <button id="btn-back-faucet" class="back-btn">←</button>
+        <h2>Testnet Faucet</h2>
+      </div>
+
+      <div class="faucet-container">
+        <div class="faucet-icon">💧</div>
+        <h3>Get Free VIBE</h3>
+        <p class="faucet-description">
+          Claim free testnet VIBE tokens for testing purposes.
+          You can claim once every 24 hours.
+        </p>
+
+        <div class="claim-amount">
+          <span class="amount">100</span>
+          <span class="currency">VIBE</span>
+        </div>
+
+        <button id="btn-claim-faucet" class="btn primary large">
+          Claim Tokens
+        </button>
+
+        <p id="faucet-status" class="status-message"></p>
+
+        <p class="faucet-note">
+          Testnet tokens have no real value
+        </p>
+      </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settings-view" class="view hidden">
+      <div class="header">
+        <button id="btn-back-settings" class="back-btn">←</button>
+        <h2>Settings</h2>
+      </div>
+
+      <div class="settings-container">
+        <div class="settings-group">
+          <h4>Network</h4>
+          <div class="setting-item">
+            <span>Current Network</span>
+            <span class="setting-value">Testnet</span>
+          </div>
+          <div class="setting-item">
+            <span>Node URL</span>
+            <input type="text" id="node-url" value="http://localhost:3000" class="setting-input">
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h4>Security</h4>
+          <button id="btn-export-key" class="btn secondary full-width">
+            Export Private Key
+          </button>
+          <button id="btn-lock" class="btn secondary full-width">
+            Lock Wallet
+          </button>
+        </div>
+
+        <div class="settings-group danger">
+          <h4>Danger Zone</h4>
+          <button id="btn-reset" class="btn danger full-width">
+            Reset Wallet
+          </button>
+        </div>
+
+        <div class="version-info">
+          <p>VibeCoin Wallet v1.0.0</p>
+          <p>Proof of Vibe Consensus</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+      <span id="toast-message"></span>
+    </div>
+  </div>
+
+  <script src="src/crypto.js"></script>
+  <script src="src/wallet.js"></script>
+  <script src="src/api.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
