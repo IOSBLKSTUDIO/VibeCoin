@@ -189,15 +189,69 @@ cd VibeCoin
 # Install dependencies
 npm install
 
-# Run a local node
-npm run node
-
-# Start the wallet
-npm run wallet
-
-# Begin mining/validating
-npm run mine
+# Build
+npm run build
 ```
+
+## Run Your Own Node
+
+Join the decentralized network by running your own node on your Mac or PC!
+
+### Full Node (Mining)
+
+Full nodes store the complete blockchain and can mine new blocks to earn VIBE.
+
+```bash
+# Create a new wallet and start mining
+node dist/cli.js --mine --miner new --network testnet
+
+# Or use an existing wallet
+node dist/cli.js --mine --miner "your-private-key" --network testnet
+```
+
+**Important**: Save your private key! It's the only way to restore your wallet.
+
+### Light Node (Eco Mode)
+
+Light nodes use minimal resources - perfect for laptops or low-power devices.
+
+```bash
+node dist/cli.js --light --network testnet
+```
+
+Benefits:
+- ~99% less storage (headers only)
+- Minimal CPU usage
+- Can send/receive transactions
+- Eco-friendly
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--network` | mainnet, testnet, local | testnet |
+| `--mine` | Enable mining | false |
+| `--miner` | Private key or "new" | - |
+| `--light` | Eco-friendly light mode | false |
+| `--api-port` | REST API port | 3000 |
+| `--p2p-port` | P2P network port | 6001 |
+| `--peers` | Connect to specific peers | - |
+
+### Wallet Backup & Restore
+
+Your VIBE are stored in the blockchain, not on your computer. To restore your wallet anywhere:
+
+```bash
+node dist/cli.js --mine --miner "your-saved-private-key" --network testnet
+```
+
+The node will sync with the network and your balance will be restored automatically.
+
+### Full Documentation
+
+For complete setup guide, cloud deployment, and troubleshooting:
+
+**[Read the Full Node Documentation](docs/RUNNING_A_NODE.md)**
 
 ---
 
@@ -308,6 +362,66 @@ Contrairement au Proof of Work ou Proof of Stake traditionnels, notre mécanisme
 - [ ] Listings CEX
 - [ ] Marketplace NFT
 - [ ] Campagne marketing globale
+
+## Lancer Votre Propre Nœud
+
+Rejoignez le réseau décentralisé en lançant votre propre nœud sur votre Mac ou PC !
+
+### Full Node (Minage)
+
+Les full nodes stockent la blockchain complète et peuvent miner des blocs pour gagner des VIBE.
+
+```bash
+# Créer un nouveau wallet et commencer à miner
+node dist/cli.js --mine --miner new --network testnet
+
+# Ou utiliser un wallet existant
+node dist/cli.js --mine --miner "votre-clé-privée" --network testnet
+```
+
+**Important** : Sauvegardez votre clé privée ! C'est le seul moyen de restaurer votre wallet.
+
+### Light Node (Mode Éco)
+
+Les light nodes utilisent un minimum de ressources - parfait pour les laptops.
+
+```bash
+node dist/cli.js --light --network testnet
+```
+
+Avantages :
+- ~99% moins de stockage (headers uniquement)
+- Utilisation CPU minimale
+- Peut envoyer/recevoir des transactions
+- Éco-responsable
+
+### Options CLI
+
+| Option | Description | Défaut |
+|--------|-------------|--------|
+| `--network` | mainnet, testnet, local | testnet |
+| `--mine` | Activer le minage | false |
+| `--miner` | Clé privée ou "new" | - |
+| `--light` | Mode éco light node | false |
+| `--api-port` | Port API REST | 3000 |
+| `--p2p-port` | Port réseau P2P | 6001 |
+| `--peers` | Se connecter à des peers spécifiques | - |
+
+### Sauvegarde & Restauration du Wallet
+
+Vos VIBE sont stockés dans la blockchain, pas sur votre ordinateur. Pour restaurer votre wallet n'importe où :
+
+```bash
+node dist/cli.js --mine --miner "votre-clé-privée-sauvegardée" --network testnet
+```
+
+Le nœud se synchronisera avec le réseau et votre solde sera restauré automatiquement.
+
+### Documentation Complète
+
+Pour le guide complet, déploiement cloud et dépannage :
+
+**[Lire la Documentation Complète](docs/RUNNING_A_NODE.md)**
 
 ---
 
