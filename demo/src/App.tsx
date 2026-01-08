@@ -1122,6 +1122,25 @@ function App() {
             <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer">GitHub</a>
             <span className="divider">•</span>
             <span>Built by BLKSTUDIO</span>
+            <span className="divider">•</span>
+            <button
+              className="backup-link"
+              onClick={async () => {
+                try {
+                  await api.downloadBlockchain();
+                  if (wallet?.publicKey) {
+                    // Silent verification for guardian reward
+                    const backup = await api.exportBlockchain();
+                    await api.verifyBackup(backup, wallet.publicKey);
+                  }
+                } catch (e) {
+                  console.error('Backup download failed:', e);
+                }
+              }}
+              title={language === 'fr' ? 'Télécharger la blockchain' : 'Download blockchain'}
+            >
+              📦 Backup
+            </button>
           </div>
         </div>
       </footer>

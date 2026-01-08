@@ -889,6 +889,177 @@ export class API {
       }
     });
 
+    // ==================== BLOCKCHAIN BACKUP (Guardian System) ====================
+
+    // Guardian reward configuration (not publicly documented)
+    const GUARDIAN_REWARD = 50; // VIBE for valid backup restoration
+    const GUARDIAN_COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours between rewards
+
+    // Export full blockchain (for backup)
+    this.app.get('/blockchain/export', (_req: Request, res: Response) => {
+      try {
+        const exportData = {
+          version: '1.0.0',
+          network: 'testnet',
+          exportedAt: new Date().toISOString(),
+          blocks: this.blockchain.chain.map(block => block.toJSON()),
+          pendingTransactions: this.blockchain.pendingTransactions.map(tx => tx.toJSON()),
+          stats: this.blockchain.getStats(),
+          checksum: this.blockchain.getLatestBlock().hash // For integrity verification
+        };
+
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename=vibecoin-blockchain-${Date.now()}.json`);
+        res.json(exportData);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get blockchain snapshot info (lightweight check)
+    this.app.get('/blockchain/snapshot', (_req: Request, res: Response) => {
+      res.json({
+        blocks: this.blockchain.chain.length,
+        latestHash: this.blockchain.getLatestBlock().hash,
+        latestIndex: this.blockchain.getLatestBlock().index,
+        pendingTx: this.blockchain.pendingTransactions.length,
+        timestamp: Date.now()
+      });
+    });
+
+    // Verify a backup file and optionally reward the guardian
+    this.app.post('/blockchain/verify-backup', async (req: Request, res: Response) => {
+      try {
+        const { backup, guardianAddress } = req.body;
+
+        if (!backup || !backup.blocks || !Array.isArray(backup.blocks)) {
+          return res.status(400).json({ error: 'Invalid backup format' });
+        }
+
+        // Verify backup integrity
+        const backupBlocks = backup.blocks.length;
+        const currentBlocks = this.blockchain.chain.length;
+
+        // Check if backup has valid structure
+        let isValid = true;
+        let validationErrors: string[] = [];
+
+        // Basic structure validation
+        if (!backup.checksum) {
+          isValid = false;
+          validationErrors.push('Missing checksum');
+        }
+
+        // Verify block chain integrity in backup
+        for (let i = 1; i < backup.blocks.length; i++) {
+          if (backup.blocks[i].previousHash !== backup.blocks[i - 1].hash) {
+            isValid = false;
+            validationErrors.push(`Block ${i} has invalid previousHash`);
+            break;
+          }
+        }
+
+        // Check if backup matches our chain (for overlapping blocks)
+        const overlapEnd = Math.min(backupBlocks, currentBlocks);
+        for (let i = 0; i < overlapEnd; i++) {
+          if (backup.blocks[i].hash !== this.blockchain.chain[i].hash) {
+            isValid = false;
+            validationErrors.push(`Block ${i} hash mismatch - possible fork`);
+            break;
+          }
+        }
+
+        const result: any = {
+          valid: isValid,
+          backupBlocks,
+          currentBlocks,
+          errors: validationErrors,
+          isUseful: backupBlocks >= currentBlocks && isValid, // Backup is useful if valid and >= current
+        };
+
+        // Guardian reward (secret feature - only if backup is valid and useful)
+        if (guardianAddress && isValid && backupBlocks >= currentBlocks) {
+          const activity = this.getOrCreateActivity(guardianAddress);
+          const now = Date.now();
+          const lastGuardianReward = (activity as any).lastGuardianReward || 0;
+
+          if (now - lastGuardianReward >= GUARDIAN_COOLDOWN) {
+            // Reward the guardian
+            const tx = Transaction.createCoinbase(guardianAddress, GUARDIAN_REWARD);
+            tx.data = 'Guardian Backup Verification';
+            this.blockchain.pendingTransactions.push(tx);
+            await this.storage.saveBlockchain(this.blockchain);
+
+            (activity as any).lastGuardianReward = now;
+            activity.totalRewardsEarned += GUARDIAN_REWARD;
+
+            result.guardianReward = GUARDIAN_REWARD;
+            result.message = 'Thank you for protecting the network!';
+          } else {
+            const hoursLeft = Math.ceil((GUARDIAN_COOLDOWN - (now - lastGuardianReward)) / 3600000);
+            result.guardianCooldown = hoursLeft;
+            result.message = `Guardian cooldown active. Try again in ${hoursLeft} hours.`;
+          }
+        }
+
+        res.json(result);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Import/restore blockchain from backup (admin/recovery feature)
+    this.app.post('/blockchain/import', async (req: Request, res: Response) => {
+      try {
+        const { backup, adminKey } = req.body;
+
+        // This is a sensitive operation - require admin key
+        // In production, this should be a secure key stored in env vars
+        const ADMIN_KEY = process.env.ADMIN_KEY || 'vibecoin-admin-2024';
+
+        if (adminKey !== ADMIN_KEY) {
+          return res.status(403).json({ error: 'Invalid admin key' });
+        }
+
+        if (!backup || !backup.blocks || !Array.isArray(backup.blocks)) {
+          return res.status(400).json({ error: 'Invalid backup format' });
+        }
+
+        // Verify chain integrity before import
+        for (let i = 1; i < backup.blocks.length; i++) {
+          if (backup.blocks[i].previousHash !== backup.blocks[i - 1].hash) {
+            return res.status(400).json({
+              error: `Chain integrity failed at block ${i}`,
+              expected: backup.blocks[i - 1].hash,
+              got: backup.blocks[i].previousHash
+            });
+          }
+        }
+
+        // Only import if backup is longer than current chain
+        if (backup.blocks.length <= this.blockchain.chain.length) {
+          return res.status(400).json({
+            error: 'Backup is not longer than current chain',
+            backupLength: backup.blocks.length,
+            currentLength: this.blockchain.chain.length
+          });
+        }
+
+        // Import the chain (this would need Blockchain method to accept imported blocks)
+        // For now, we'll just report what would happen
+        res.json({
+          success: true,
+          message: 'Blockchain import validated successfully',
+          imported: backup.blocks.length,
+          previousLength: this.blockchain.chain.length,
+          note: 'Full import requires server restart with backup file'
+        });
+
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // ==================== VALIDATION ====================
 
     // Validate blockchain

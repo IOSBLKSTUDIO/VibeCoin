@@ -195,6 +195,40 @@ class VibeCoinAPI {
       body: JSON.stringify({ address }),
     });
   }
+
+  // ==================== BLOCKCHAIN BACKUP API ====================
+
+  // Export full blockchain for backup
+  async exportBlockchain(): Promise<BlockchainExport> {
+    return this.fetch<BlockchainExport>('/blockchain/export');
+  }
+
+  // Get blockchain snapshot info (lightweight)
+  async getSnapshot(): Promise<BlockchainSnapshot> {
+    return this.fetch<BlockchainSnapshot>('/blockchain/snapshot');
+  }
+
+  // Verify backup and optionally claim guardian reward
+  async verifyBackup(backup: BlockchainExport, guardianAddress?: string): Promise<BackupVerificationResponse> {
+    return this.fetch<BackupVerificationResponse>('/blockchain/verify-backup', {
+      method: 'POST',
+      body: JSON.stringify({ backup, guardianAddress }),
+    });
+  }
+
+  // Download blockchain as file
+  async downloadBlockchain(): Promise<void> {
+    const data = await this.exportBlockchain();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vibecoin-blockchain-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
 
 // Rewards API types
@@ -290,6 +324,41 @@ export interface TwitterRewardResponse {
   totalEarned: number;
   nextShareIn: number;
   message: string;
+}
+
+// Blockchain backup types
+export interface BlockchainExport {
+  version: string;
+  network: string;
+  exportedAt: string;
+  blocks: Block[];
+  pendingTransactions: Transaction[];
+  stats: {
+    blocks: number;
+    difficulty: number;
+    circulatingSupply: number;
+    pendingTransactions: number;
+  };
+  checksum: string;
+}
+
+export interface BlockchainSnapshot {
+  blocks: number;
+  latestHash: string;
+  latestIndex: number;
+  pendingTx: number;
+  timestamp: number;
+}
+
+export interface BackupVerificationResponse {
+  valid: boolean;
+  backupBlocks: number;
+  currentBlocks: number;
+  errors: string[];
+  isUseful: boolean;
+  guardianReward?: number;
+  guardianCooldown?: number;
+  message?: string;
 }
 
 export const api = new VibeCoinAPI();
