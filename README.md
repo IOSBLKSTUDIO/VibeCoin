@@ -1,28 +1,92 @@
 # VibeCoin (VIBE)
 
-> The cryptocurrency born from the vibeCoding movement
+<div align="center">
 
-## Overview
+![VibeCoin Logo](https://img.shields.io/badge/VIBE-VibeCoin-blueviolet?style=for-the-badge&logo=bitcoin&logoColor=white)
 
-VibeCoin is an innovative altcoin project built from scratch, dedicated to the crypto universe and the vibeCoding philosophy. This project embraces the spirit of creative coding, community-driven development, and the decentralized future.
+**The First Cryptocurrency Born from the VibeCoding Movement**
 
-## Features
+*La Première Cryptomonnaie Issue du Mouvement VibeCoding*
 
-- **Pure VibeChain**: Custom blockchain implementation
-- **Proof of Vibe (PoV)**: Unique consensus mechanism
-- **Smart Contracts**: Vibe-powered contract system
-- **Community Driven**: Built by vibeCoders, for vibeCoders
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Stars](https://img.shields.io/github/stars/IOSBLKSTUDIO/VibeCoin?style=social)](https://github.com/IOSBLKSTUDIO/VibeCoin)
 
-## Project Structure
+[English](#english) | [Français](#français)
+
+</div>
+
+---
+
+# English
+
+## What is VibeCoin?
+
+**VibeCoin (VIBE)** is not just another cryptocurrency. It's a revolutionary digital asset that embodies the spirit of the **VibeCoding** movement — a philosophy where coding transcends mere syntax and becomes an art form driven by intuition, creativity, and flow state.
+
+In a world where developers are often reduced to code factories, VibeCoding emerged as a counter-movement: **code with feeling, build with passion, create with vibes**. VibeCoin is the financial backbone of this philosophy.
+
+## The VibeCoding Philosophy
+
+VibeCoding is more than a coding style — it's a mindset:
+
+- **Flow Over Force**: Write code when inspiration strikes, not just when deadlines demand
+- **Intuition-Driven Development**: Trust your developer instincts
+- **Creative Expression**: Every line of code is a brushstroke on a digital canvas
+- **Community Harmony**: Build together, vibe together, grow together
+- **Minimal Friction**: Tools should enhance creativity, not hinder it
+
+## Why VibeCoin?
+
+### The Problem We Solve
+
+The current crypto landscape is dominated by:
+- Complex, intimidating projects that exclude newcomers
+- Speculative tokens with no real community value
+- Technical barriers that contradict the spirit of decentralization
+
+### Our Solution
+
+VibeCoin creates an **inclusive ecosystem** where:
+- **Creators are rewarded** for their contributions, not just their capital
+- **Learning is incentivized** through our "Proof of Vibe" mechanism
+- **Community drives value**, not market manipulation
+- **Simplicity meets sophistication** in our technical design
+
+## Core Concepts
+
+### Proof of Vibe (PoV)
+
+Unlike traditional Proof of Work or Proof of Stake, our **Proof of Vibe** consensus mechanism rewards:
+
+| Activity | VIBE Reward |
+|----------|-------------|
+| Open source contributions | High |
+| Community mentoring | High |
+| Educational content creation | Medium |
+| Bug reporting & fixes | Medium |
+| Community engagement | Low |
+
+### The Vibe Economy
 
 ```
-VibeCoin/
-├── blockchain/       # Core blockchain implementation
-├── wallet/           # Wallet application
-├── contracts/        # Smart contracts
-├── mining/           # Mining tools and utilities
-├── docs/             # Documentation
-└── scripts/          # Utility scripts
+┌─────────────────────────────────────────────────────────────┐
+│                    VIBE ECOSYSTEM                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
+│   │  CREATORS   │───▶│   VIBE      │◀───│  LEARNERS   │    │
+│   │  Developers │    │   TOKEN     │    │  Students   │    │
+│   │  Artists    │    │             │    │  Newcomers  │    │
+│   └─────────────┘    └──────┬──────┘    └─────────────┘    │
+│                             │                               │
+│                             ▼                               │
+│                    ┌─────────────┐                          │
+│                    │  COMMUNITY  │                          │
+│                    │  Governance │                          │
+│                    │  DAO        │                          │
+│                    └─────────────┘                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Token Economics
@@ -32,41 +96,256 @@ VibeCoin/
 | **Name** | VibeCoin |
 | **Symbol** | VIBE |
 | **Total Supply** | 21,000,000 VIBE |
+| **Initial Distribution** | Community: 60% / Team: 15% / Development: 15% / Reserve: 10% |
 | **Block Time** | ~10 seconds |
 | **Consensus** | Proof of Vibe (PoV) |
+| **Decimals** | 8 |
+
+### Distribution Breakdown
+
+```
+Community Rewards    ████████████████████████░░░░░░░░░░░░░░░░  60%
+Team & Founders      ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  15%
+Development Fund     ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  15%
+Emergency Reserve    ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  10%
+```
+
+## Use Cases
+
+### 1. Creator Economy
+- Tip developers for helpful open-source code
+- Fund creative coding projects
+- Reward educational content creators
+
+### 2. Learning Platform
+- Earn VIBE by completing coding challenges
+- Stake VIBE to access premium tutorials
+- Mentorship marketplace
+
+### 3. Governance
+- Vote on project direction
+- Propose new features
+- Community treasury management
+
+### 4. NFT Marketplace
+- Mint code snippets as NFTs
+- Trade creative coding art
+- Collectible developer achievements
+
+## Roadmap
+
+### Phase 1: Foundation (Q1 2025)
+- [x] Project initialization
+- [ ] Core blockchain development
+- [ ] Basic wallet implementation
+- [ ] Testnet launch
+
+### Phase 2: Growth (Q2 2025)
+- [ ] Smart contract engine
+- [ ] Web wallet release
+- [ ] Mobile wallet (iOS/Android)
+- [ ] DEX listing
+
+### Phase 3: Ecosystem (Q3 2025)
+- [ ] DAO governance launch
+- [ ] Creator rewards program
+- [ ] Learning platform beta
+- [ ] Partnership announcements
+
+### Phase 4: Mainstream (Q4 2025)
+- [ ] Mainnet launch
+- [ ] CEX listings
+- [ ] NFT marketplace
+- [ ] Global marketing campaign
+
+## Technical Architecture
+
+```
+VibeCoin/
+├── blockchain/           # Core blockchain engine
+│   ├── block.js          # Block structure
+│   ├── chain.js          # Chain management
+│   ├── consensus.js      # Proof of Vibe algorithm
+│   └── network/          # P2P networking
+├── wallet/               # Wallet implementations
+│   ├── core/             # Core wallet logic
+│   ├── web/              # Web wallet UI
+│   └── cli/              # Command-line wallet
+├── contracts/            # Smart contract system
+│   ├── engine/           # Contract execution engine
+│   └── examples/         # Sample contracts
+├── mining/               # Mining/Validation tools
+├── api/                  # REST API for integrations
+└── docs/                 # Technical documentation
+```
 
 ## Getting Started
 
 ```bash
 # Clone the repository
 git clone https://github.com/IOSBLKSTUDIO/VibeCoin.git
-
-# Navigate to project
 cd VibeCoin
 
 # Install dependencies
 npm install
 
-# Run local node
+# Run a local node
 npm run node
+
+# Start the wallet
+npm run wallet
+
+# Begin mining/validating
+npm run mine
 ```
-
-## Roadmap
-
-- [ ] Phase 1: Core blockchain development
-- [ ] Phase 2: Wallet implementation
-- [ ] Phase 3: Smart contract engine
-- [ ] Phase 4: Testnet launch
-- [ ] Phase 5: Mainnet deployment
-
-## Contributing
-
-VibeCoin is open source and welcomes contributions from the vibeCoding community. Feel free to submit issues, fork the repository, and send pull requests.
-
-## License
-
-MIT License - Built with vibes by BLKSTUDIO
 
 ---
 
-**Disclaimer**: This is an educational/experimental project. Always do your own research before investing in any cryptocurrency.
+# Français
+
+## Qu'est-ce que VibeCoin ?
+
+**VibeCoin (VIBE)** n'est pas une cryptomonnaie comme les autres. C'est un actif numérique révolutionnaire qui incarne l'esprit du mouvement **VibeCoding** — une philosophie où le code transcende la simple syntaxe pour devenir un art guidé par l'intuition, la créativité et l'état de flow.
+
+Dans un monde où les développeurs sont souvent réduits à de simples usines à code, le VibeCoding a émergé comme un contre-mouvement : **coder avec émotion, construire avec passion, créer avec des vibes**.
+
+## La Philosophie VibeCoding
+
+Le VibeCoding est plus qu'un style de programmation — c'est un état d'esprit :
+
+- **Le Flow avant la Force** : Écrire du code quand l'inspiration frappe
+- **Développement Guidé par l'Intuition** : Faire confiance à son instinct de développeur
+- **Expression Créative** : Chaque ligne de code est un coup de pinceau sur une toile numérique
+- **Harmonie Communautaire** : Construire ensemble, vibrer ensemble, grandir ensemble
+- **Friction Minimale** : Les outils doivent amplifier la créativité, pas l'entraver
+
+## Pourquoi VibeCoin ?
+
+### Le Problème que Nous Résolvons
+
+Le paysage crypto actuel est dominé par :
+- Des projets complexes et intimidants qui excluent les nouveaux venus
+- Des tokens spéculatifs sans vraie valeur communautaire
+- Des barrières techniques qui contredisent l'esprit de décentralisation
+
+### Notre Solution
+
+VibeCoin crée un **écosystème inclusif** où :
+- **Les créateurs sont récompensés** pour leurs contributions, pas seulement leur capital
+- **L'apprentissage est incité** via notre mécanisme "Proof of Vibe"
+- **La communauté génère la valeur**, pas la manipulation de marché
+- **La simplicité rencontre la sophistication** dans notre design technique
+
+## Concepts Clés
+
+### Proof of Vibe (PoV) - Preuve de Vibe
+
+Contrairement au Proof of Work ou Proof of Stake traditionnels, notre mécanisme de consensus **Proof of Vibe** récompense :
+
+| Activité | Récompense VIBE |
+|----------|-----------------|
+| Contributions open source | Élevée |
+| Mentorat communautaire | Élevée |
+| Création de contenu éducatif | Moyenne |
+| Signalement & correction de bugs | Moyenne |
+| Engagement communautaire | Faible |
+
+## Tokenomics
+
+| Propriété | Valeur |
+|-----------|--------|
+| **Nom** | VibeCoin |
+| **Symbole** | VIBE |
+| **Supply Total** | 21 000 000 VIBE |
+| **Distribution Initiale** | Communauté: 60% / Équipe: 15% / Développement: 15% / Réserve: 10% |
+| **Temps de Bloc** | ~10 secondes |
+| **Consensus** | Proof of Vibe (PoV) |
+
+## Cas d'Usage
+
+### 1. Économie des Créateurs
+- Donner des pourboires aux développeurs pour leur code open-source
+- Financer des projets de creative coding
+- Récompenser les créateurs de contenu éducatif
+
+### 2. Plateforme d'Apprentissage
+- Gagner des VIBE en complétant des défis de code
+- Staker des VIBE pour accéder aux tutoriels premium
+- Marketplace de mentorat
+
+### 3. Gouvernance
+- Voter sur la direction du projet
+- Proposer de nouvelles fonctionnalités
+- Gestion de la trésorerie communautaire
+
+### 4. Marketplace NFT
+- Mint des snippets de code en NFT
+- Échanger de l'art de creative coding
+- Achievements développeur collectibles
+
+## Feuille de Route
+
+### Phase 1 : Fondation (T1 2025)
+- [x] Initialisation du projet
+- [ ] Développement du blockchain core
+- [ ] Implémentation wallet basique
+- [ ] Lancement testnet
+
+### Phase 2 : Croissance (T2 2025)
+- [ ] Moteur de smart contracts
+- [ ] Release wallet web
+- [ ] Wallet mobile (iOS/Android)
+- [ ] Listing DEX
+
+### Phase 3 : Écosystème (T3 2025)
+- [ ] Lancement gouvernance DAO
+- [ ] Programme récompenses créateurs
+- [ ] Plateforme d'apprentissage beta
+- [ ] Annonces partenariats
+
+### Phase 4 : Grand Public (T4 2025)
+- [ ] Lancement mainnet
+- [ ] Listings CEX
+- [ ] Marketplace NFT
+- [ ] Campagne marketing globale
+
+---
+
+## Contributing / Contribuer
+
+VibeCoin is open source and welcomes contributions from the vibeCoding community.
+
+VibeCoin est open source et accueille les contributions de la communauté vibeCoding.
+
+```bash
+# Fork the repo / Forker le repo
+# Create your branch / Créer votre branche
+git checkout -b feature/amazing-feature
+
+# Commit your changes / Commiter vos changements
+git commit -m "Add amazing feature"
+
+# Push and create PR / Pousser et créer une PR
+git push origin feature/amazing-feature
+```
+
+## Community / Communauté
+
+- **GitHub**: [IOSBLKSTUDIO/VibeCoin](https://github.com/IOSBLKSTUDIO/VibeCoin)
+- **Twitter/X**: Coming soon
+- **Discord**: Coming soon
+- **Telegram**: Coming soon
+
+## License / Licence
+
+MIT License - Built with vibes by **BLKSTUDIO**
+
+---
+
+<div align="center">
+
+**"Code with feeling. Build with passion. Create with vibes."**
+
+*"Coder avec émotion. Construire avec passion. Créer avec des vibes."*
+
+</div>
