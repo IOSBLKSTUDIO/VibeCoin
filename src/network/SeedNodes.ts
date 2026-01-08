@@ -14,20 +14,31 @@ export interface SeedNode {
 
 /**
  * Official VibeCoin seed nodes by network
+ *
+ * IMPORTANT: Multiple independent seed nodes ensure decentralization.
+ * If one goes down, others keep the network alive.
+ * Anyone can run a seed node and submit it for inclusion here.
  */
 export const SEED_NODES: Record<string, SeedNode[]> = {
   mainnet: [
-    // Future mainnet nodes
+    // Future mainnet nodes - will be distributed globally
     { address: 'seed1.vibecoin.network:6001', name: 'VibeSeed EU', region: 'europe', isPublic: true },
     { address: 'seed2.vibecoin.network:6001', name: 'VibeSeed US', region: 'us-east', isPublic: true },
     { address: 'seed3.vibecoin.network:6001', name: 'VibeSeed Asia', region: 'asia', isPublic: true },
   ],
   testnet: [
-    // Testnet nodes - more permissive
+    // === PRIMARY CLOUD NODES (always online) ===
+    // These use WebSocket over HTTPS (/p2p endpoint)
+    { address: 'vibecoin-testnet.onrender.com', name: 'Render Cloud', region: 'us', isPublic: true },
+
+    // === COMMUNITY NODES ===
+    // Add your node here! Submit a PR to GitHub
+    // Format: { address: 'your-domain.com', name: 'Your Name', region: 'your-region', isPublic: true }
+
+    // === FALLBACK NODES ===
+    // Future DNS seeds
     { address: 'testnet1.vibecoin.network:6001', name: 'Testnet EU', region: 'europe', isPublic: true },
     { address: 'testnet2.vibecoin.network:6001', name: 'Testnet US', region: 'us-east', isPublic: true },
-    // Local/dev seed for testing
-    { address: 'localhost:6001', name: 'Local Dev', region: 'local', isPublic: false },
   ],
   local: [
     // Local development only
@@ -35,6 +46,24 @@ export const SEED_NODES: Record<string, SeedNode[]> = {
     { address: 'localhost:6002', name: 'Local Secondary', region: 'local', isPublic: false },
   ]
 };
+
+/**
+ * HARDCODED FALLBACK PEERS
+ *
+ * These are compiled into the binary. Even if ALL seed nodes are down,
+ * nodes can try these IPs directly. This is how Bitcoin survives.
+ *
+ * Community members: Add your always-online node here!
+ */
+export const FALLBACK_PEERS: string[] = [
+  // Cloud nodes (WebSocket over HTTPS)
+  'vibecoin-testnet.onrender.com',
+
+  // Add more fallback peers as the network grows:
+  // 'your-node.herokuapp.com',
+  // 'vibecoin.your-domain.com',
+  // '123.456.789.10:6001',  // Static IP if you have one
+];
 
 /**
  * Bootstrap DNS seeds (future implementation)
@@ -91,6 +120,16 @@ export function getSeedNodes(network: string): string[] {
 export function getPublicSeedNodes(network: string): string[] {
   const nodes = SEED_NODES[network] || SEED_NODES.testnet;
   return nodes.filter(n => n.isPublic).map(n => n.address);
+}
+
+/**
+ * Get all possible peers including fallbacks
+ * Used when normal discovery fails
+ */
+export function getAllPossiblePeers(network: string): string[] {
+  const seeds = getSeedNodes(network);
+  const unique = new Set([...seeds, ...FALLBACK_PEERS]);
+  return Array.from(unique);
 }
 
 /**
