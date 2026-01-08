@@ -1134,3 +1134,25 @@ body {
   font-size: 0.8rem;
   word-break: break-word;
 }
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px dashed var(--border-color);
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p:last-of-type {
+  margin-bottom: 1.5rem;
+}
+
+.empty-state .btn {
+  margin-top: 1rem;
+}

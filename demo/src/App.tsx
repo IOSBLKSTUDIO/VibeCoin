@@ -28,39 +28,8 @@ interface Validator {
 
 type View = 'home' | 'wallet' | 'validator' | 'vote' | 'explorer' | 'faucet' | 'send';
 
-// Default validators
-const DEFAULT_VALIDATORS: Validator[] = [
-  {
-    address: '04abc123def456789abcdef123456789abcdef123456789abcdef123456789abc',
-    name: 'VibeNode_Genesis',
-    stake: 10000,
-    votes: 5000,
-    vibeScore: 95.5,
-    isActive: true,
-    blocksProduced: 1247,
-    contributionScore: 85
-  },
-  {
-    address: '04def789abc123456def789abc123456def789abc123456def789abc123456def',
-    name: 'CryptoVibe_EU',
-    stake: 7500,
-    votes: 3200,
-    vibeScore: 82.3,
-    isActive: true,
-    blocksProduced: 893,
-    contributionScore: 72
-  },
-  {
-    address: '04ghi321jkl654987ghi321jkl654987ghi321jkl654987ghi321jkl654987ghi',
-    name: 'VibeMaster_Asia',
-    stake: 5000,
-    votes: 2800,
-    vibeScore: 76.8,
-    isActive: true,
-    blocksProduced: 654,
-    contributionScore: 68
-  }
-];
+// Empty validators list - real testnet starts clean
+const DEFAULT_VALIDATORS: Validator[] = [];
 
 function App() {
   // Initialize blockchain with localStorage data
@@ -108,7 +77,7 @@ function App() {
         return ['Welcome back to VibeCoin!'];
       }
     }
-    return ['Welcome to VibeCoin!', 'Create a wallet and claim free VIBE from the faucet!'];
+    return ['Welcome to VibeCoin Testnet!', 'Create a wallet and claim free VIBE from the faucet to get started.'];
   });
 
   const [, forceUpdate] = useState({});
@@ -673,23 +642,33 @@ function App() {
       </p>
 
       <div className="validators-list">
-        {validators
-          .sort((a, b) => b.vibeScore - a.vibeScore)
-          .map((validator, index) => (
-            <ValidatorCard
-              key={validator.address}
-              rank={index + 1}
-              name={validator.name}
-              address={validator.address}
-              stake={validator.stake}
-              votes={validator.votes}
-              vibeScore={validator.vibeScore}
-              isActive={index < 21}
-              blocksProduced={validator.blocksProduced}
-              onVote={() => voteForValidator(validator.address)}
-              hasVoted={votedValidators.has(validator.address)}
-            />
-          ))}
+        {validators.length === 0 ? (
+          <div className="empty-state">
+            <p>No validators yet on the testnet.</p>
+            <p>Be the first to register as a validator!</p>
+            <button className="btn primary" onClick={() => setCurrentView('validator')}>
+              Become a Validator
+            </button>
+          </div>
+        ) : (
+          validators
+            .sort((a, b) => b.vibeScore - a.vibeScore)
+            .map((validator, index) => (
+              <ValidatorCard
+                key={validator.address}
+                rank={index + 1}
+                name={validator.name}
+                address={validator.address}
+                stake={validator.stake}
+                votes={validator.votes}
+                vibeScore={validator.vibeScore}
+                isActive={index < 21}
+                blocksProduced={validator.blocksProduced}
+                onVote={() => voteForValidator(validator.address)}
+                hasVoted={votedValidators.has(validator.address)}
+              />
+            ))
+        )}
       </div>
     </div>
   );
