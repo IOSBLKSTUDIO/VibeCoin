@@ -56,9 +56,16 @@ NETWORK OPTIONS:
 
   --peers <addresses>   Additional peer addresses (comma-separated)
                         Example: --peers "192.168.1.10:6001,node.example.com:6001"
+                        For cloud nodes: --peers "your-app.onrender.com"
 
   --external <address>  Your external IP:port for NAT traversal
                         Example: --external "my-node.dyndns.org:6001"
+
+CLOUD CONNECTION:
+  Connect to a cloud-hosted VibeCoin node (Render, Heroku, etc.):
+  --peers "vibecoin-testnet.onrender.com"
+
+  The CLI automatically detects cloud URLs and connects via WebSocket (wss://)
 
 MINING OPTIONS:
   --mine                Enable automatic mining (full node only)

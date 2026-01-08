@@ -1173,16 +1173,25 @@ export class API {
     this.nodeWallet = wallet;
   }
 
+  private httpServer: any = null;
+
   /**
    * Start the API server
    */
-  start(): Promise<void> {
+  start(): Promise<any> {
     return new Promise((resolve) => {
-      this.app.listen(this.config.port, this.config.host, () => {
+      this.httpServer = this.app.listen(this.config.port, this.config.host, () => {
         console.log(`🌐 API running at http://${this.config.host}:${this.config.port}`);
-        resolve();
+        resolve(this.httpServer);
       });
     });
+  }
+
+  /**
+   * Get the HTTP server instance (for WebSocket attachment)
+   */
+  getHttpServer(): any {
+    return this.httpServer;
   }
 
   /**

@@ -66,10 +66,20 @@ if (MINER_PRIVATE_KEY) {
 }
 console.log('');
 
+// Detect if running in cloud environment (Render, Heroku, etc.)
+const IS_CLOUD = !!(process.env.RENDER || process.env.HEROKU || process.env.DYNO || process.env.CLOUD_MODE === 'true');
+
+// In cloud mode, P2P WebSocket is attached to HTTP server (same port)
+// Users connect via wss://your-app.onrender.com/p2p
+if (IS_CLOUD) {
+  console.log(`☁️  Cloud environment detected - P2P will use /p2p endpoint on port ${PORT}`);
+}
+
 // Initialize and start the node
 const node = new Node({
   network: 'testnet',
   dataDir: DATA_DIR,
+  cloudMode: IS_CLOUD,  // Enable cloud mode for Render/Heroku
   api: {
     port: PORT,
     host: '0.0.0.0'

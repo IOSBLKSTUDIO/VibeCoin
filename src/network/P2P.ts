@@ -79,6 +79,8 @@ export interface P2PConfig {
   network: 'mainnet' | 'testnet' | 'local';
   externalAddress?: string;  // For NAT traversal
   capabilities: NodeCapability[];
+  // For cloud deployment: attach to existing HTTP server instead of creating new WebSocket server
+  httpServer?: any;  // http.Server instance
 }
 
 export class P2PNetwork {
@@ -357,17 +359,44 @@ export class P2PNetwork {
   }
 
   /**
-   * Start P2P server
+   * Attach P2P to an existing HTTP server (for cloud deployment)
+   * This allows P2P WebSocket connections on the same port as the API
    */
-  async start(): Promise<void> {
-    this.server = new WebSocketServer({ port: this.config.port });
+  attachToServer(httpServer: any): void {
+    this.server = new WebSocketServer({
+      server: httpServer,
+      path: '/p2p'  // WebSocket endpoint: wss://your-app.onrender.com/p2p
+    });
 
     this.server.on('connection', (ws, req) => {
       const address = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
+      console.log(`🔗 P2P connection from ${address} via /p2p endpoint`);
       this.handleConnection(ws, address, false);
     });
 
-    console.log(`🔗 P2P server running on port ${this.config.port}`);
+    console.log(`🔗 P2P WebSocket attached to HTTP server at /p2p`);
+  }
+
+  /**
+   * Start P2P server
+   */
+  async start(): Promise<void> {
+    // If an HTTP server was provided, attach to it instead of creating standalone
+    if (this.config.httpServer) {
+      this.attachToServer(this.config.httpServer);
+      console.log(`🔗 P2P attached to HTTP server (cloud mode)`);
+    } else {
+      // Standalone WebSocket server (traditional mode)
+      this.server = new WebSocketServer({ port: this.config.port });
+
+      this.server.on('connection', (ws, req) => {
+        const address = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
+        this.handleConnection(ws, address, false);
+      });
+
+      console.log(`🔗 P2P server running on port ${this.config.port}`);
+    }
+
     console.log(`📍 Node ID: ${this.nodeId.substring(0, 8)}...`);
     console.log(`🌐 Network: ${this.config.network}`);
 
@@ -452,6 +481,10 @@ export class P2PNetwork {
 
   /**
    * Connect to a peer
+   * Supports multiple formats:
+   * - "host:port" -> ws://host:port (traditional)
+   * - "wss://host.com/p2p" -> WebSocket over HTTPS (cloud)
+   * - "ws://host:port/p2p" -> WebSocket with path
    */
   async connectToPeer(address: string): Promise<boolean> {
     if (this.peers.has(address) || this.peers.size >= this.config.maxPeers) {
@@ -459,7 +492,20 @@ export class P2PNetwork {
     }
 
     try {
-      const ws = new WebSocket(`ws://${address}`);
+      // Determine the WebSocket URL
+      let wsUrl: string;
+      if (address.startsWith('ws://') || address.startsWith('wss://')) {
+        // Already a full WebSocket URL
+        wsUrl = address;
+      } else if (address.includes('.onrender.com') || address.includes('.herokuapp.com') || address.includes('.vercel.app')) {
+        // Cloud deployment - use wss:// with /p2p path
+        wsUrl = `wss://${address}/p2p`;
+      } else {
+        // Traditional format: host:port
+        wsUrl = `ws://${address}`;
+      }
+
+      const ws = new WebSocket(wsUrl);
 
       return new Promise((resolve) => {
         ws.on('open', () => {

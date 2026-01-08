@@ -22,6 +22,8 @@ export interface NodeConfig {
   lightMode: boolean;
   // External address for NAT traversal
   externalAddress?: string;
+  // Cloud mode: P2P WebSocket attached to HTTP server (same port)
+  cloudMode?: boolean;
 }
 
 const DEFAULT_CONFIG: NodeConfig = {
@@ -112,9 +114,14 @@ export class Node {
     await this.api.init();
 
     // Start API
-    await this.api.start();
+    const httpServer = await this.api.start();
 
-    // Start P2P
+    // Start P2P - in cloud mode, attach to HTTP server
+    if (this.config.cloudMode) {
+      // Attach P2P WebSocket to the same HTTP server (for Render, Heroku, etc.)
+      this.p2p.attachToServer(httpServer);
+      console.log(`☁️  Cloud mode: P2P WebSocket available at /p2p endpoint`);
+    }
     await this.p2p.start();
 
     // Start mining if enabled
