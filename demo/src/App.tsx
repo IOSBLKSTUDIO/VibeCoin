@@ -27,7 +27,7 @@ You can talk to me naturally, for example:
 
 What would you like to do?`,
     walletExists: (address: string, balance: number) => `You already have a wallet! Your address is:\n\n\`${address}...\`\n\nBalance: ${balance.toFixed(2)} VIBE`,
-    walletCreated: (publicKey: string) => `Wallet created successfully!\n\nYour address:\n\`${publicKey}\`\n\nNow you can ask me for some free testnet VIBE!`,
+    walletCreated: (publicKey: string, mnemonic: string) => `Wallet created successfully!\n\nYour address:\n\`${publicKey.substring(0, 32)}...\`\n\n🔐 **IMPORTANT: Save your secret recovery phrase!**\n\n\`${mnemonic}\`\n\n⚠️ This phrase is the ONLY way to recover your wallet. Write it down and keep it safe. Never share it with anyone!\n\nNow you can ask me for some free testnet VIBE!`,
     walletCreateFailed: `Failed to create wallet. The network might be offline.`,
     noWallet: `You don't have a wallet yet! Say "create a wallet" first.`,
     faucetSuccess: (message: string, remaining: number, nextIn: number) => `${message}\n\n📦 ${remaining} claims remaining today\n⏱️ Next claim available in ${nextIn} minutes`,
@@ -48,7 +48,10 @@ What would you like to do?`,
     noWalletToDelete: `You don't have a wallet to delete.`,
     walletDeleted: `Wallet deleted. Your funds are lost forever (it's testnet, don't worry!). Say "create a wallet" to start fresh.`,
     greeting: (hasWallet: boolean, balance: number) => `Hey there! Welcome to VibeCoin. ${hasWallet ? `Your balance is ${balance.toFixed(2)} VIBE.` : `Say "create a wallet" to get started!`}`,
-    notUnderstood: `I didn't quite understand that. Try saying:\n• "Create a wallet"\n• "Give me some VIBE"\n• "What's my balance?"\n• "Show me the blocks"\n\nOr just say "help" for more options!`,
+    walletRestored: (publicKey: string) => `Wallet restored successfully!\n\nYour address:\n\`${publicKey.substring(0, 32)}...\`\n\n✅ You can now use your wallet. Ask me for your balance or some free testnet VIBE!`,
+    walletRestoreFailed: `Invalid recovery phrase. Please make sure you entered all 12 words correctly, separated by spaces.`,
+    walletRestoreInstructions: `To restore your wallet, type: "restore" followed by your 12-word recovery phrase.\n\nExample: "restore word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"`,
+    notUnderstood: `I didn't quite understand that. Try saying:\n• "Create a wallet"\n• "Give me some VIBE"\n• "What's my balance?"\n• "Show me the blocks"\n• "Restore my wallet"\n\nOr just say "help" for more options!`,
     error: `Something went wrong. Please try again.`,
     placeholder: `Type a message... (e.g., 'give me some VIBE')`,
     langChanged: `Language changed to English! How can I help you?`
@@ -65,7 +68,7 @@ Vous pouvez me parler naturellement, par exemple :
 
 Que souhaitez-vous faire ?`,
     walletExists: (address: string, balance: number) => `Vous avez déjà un wallet ! Votre adresse est :\n\n\`${address}...\`\n\nSolde : ${balance.toFixed(2)} VIBE`,
-    walletCreated: (publicKey: string) => `Wallet créé avec succès !\n\nVotre adresse :\n\`${publicKey}\`\n\nMaintenant vous pouvez me demander des VIBE gratuits pour le testnet !`,
+    walletCreated: (publicKey: string, mnemonic: string) => `Wallet créé avec succès !\n\nVotre adresse :\n\`${publicKey.substring(0, 32)}...\`\n\n🔐 **IMPORTANT : Sauvegardez votre phrase de récupération secrète !**\n\n\`${mnemonic}\`\n\n⚠️ Cette phrase est le SEUL moyen de récupérer votre wallet. Notez-la et gardez-la en sécurité. Ne la partagez jamais avec personne !\n\nMaintenant vous pouvez me demander des VIBE gratuits pour le testnet !`,
     walletCreateFailed: `Échec de la création du wallet. Le réseau est peut-être hors ligne.`,
     noWallet: `Vous n'avez pas encore de wallet ! Dites "crée un wallet" d'abord.`,
     faucetSuccess: (message: string, remaining: number, nextIn: number) => `${message}\n\n📦 ${remaining} demandes restantes aujourd'hui\n⏱️ Prochaine demande disponible dans ${nextIn} minutes`,
@@ -86,7 +89,10 @@ Que souhaitez-vous faire ?`,
     noWalletToDelete: `Vous n'avez pas de wallet à supprimer.`,
     walletDeleted: `Wallet supprimé. Vos fonds sont perdus à jamais (c'est le testnet, pas de souci !). Dites "crée un wallet" pour recommencer.`,
     greeting: (hasWallet: boolean, balance: number) => `Salut ! Bienvenue sur VibeCoin. ${hasWallet ? `Votre solde est de ${balance.toFixed(2)} VIBE.` : `Dites "crée un wallet" pour commencer !`}`,
-    notUnderstood: `Je n'ai pas bien compris. Essayez de dire :\n• "Crée un wallet"\n• "Donne-moi des VIBE"\n• "Quel est mon solde ?"\n• "Montre les blocs"\n\nOu dites "aide" pour plus d'options !`,
+    walletRestored: (publicKey: string) => `Wallet restauré avec succès !\n\nVotre adresse :\n\`${publicKey.substring(0, 32)}...\`\n\n✅ Vous pouvez maintenant utiliser votre wallet. Demandez-moi votre solde ou des VIBE gratuits pour le testnet !`,
+    walletRestoreFailed: `Phrase de récupération invalide. Assurez-vous d'avoir entré les 12 mots correctement, séparés par des espaces.`,
+    walletRestoreInstructions: `Pour restaurer votre wallet, tapez : "restaurer" suivi de vos 12 mots de récupération.\n\nExemple : "restaurer mot1 mot2 mot3 mot4 mot5 mot6 mot7 mot8 mot9 mot10 mot11 mot12"`,
+    notUnderstood: `Je n'ai pas bien compris. Essayez de dire :\n• "Crée un wallet"\n• "Donne-moi des VIBE"\n• "Quel est mon solde ?"\n• "Montre les blocs"\n• "Restaurer mon wallet"\n\nOu dites "aide" pour plus d'options !`,
     error: `Une erreur s'est produite. Veuillez réessayer.`,
     placeholder: `Tapez un message... (ex: 'donne-moi des VIBE')`,
     langChanged: `Langue changée en français ! Comment puis-je vous aider ?`
@@ -97,6 +103,7 @@ interface StoredWallet {
   address: string;
   publicKey: string;
   privateKey: string;
+  mnemonic?: string;
 }
 
 interface ChatMessage {
@@ -268,18 +275,52 @@ function App() {
       }
 
       try {
-        const newWallet = await api.createWallet();
+        const newWallet = await api.createWalletWithMnemonic();
         const walletData: StoredWallet = {
           address: newWallet.address,
           publicKey: newWallet.publicKey,
-          privateKey: newWallet.privateKey || ''
+          privateKey: newWallet.privateKey || '',
+          mnemonic: newWallet.mnemonic
         };
         setWallet(walletData);
         localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(walletData));
-        return t.walletCreated(walletData.publicKey);
+        return t.walletCreated(walletData.publicKey, walletData.mnemonic || '');
       } catch (error) {
         return t.walletCreateFailed;
       }
+    }
+
+    // Restore wallet from mnemonic (EN + FR)
+    if (lowerInput.match(/^(restore|recover|import|restaurer|récupérer|importer)\s+(.+)/i)) {
+      const match = input.match(/^(?:restore|recover|import|restaurer|récupérer|importer)\s+(.+)/i);
+      if (match) {
+        const mnemonic = match[1].trim().toLowerCase();
+        const wordCount = mnemonic.split(/\s+/).length;
+
+        if (wordCount !== 12) {
+          return t.walletRestoreInstructions;
+        }
+
+        try {
+          const restoredWallet = await api.restoreFromMnemonic(mnemonic);
+          const walletData: StoredWallet = {
+            address: restoredWallet.address,
+            publicKey: restoredWallet.publicKey,
+            privateKey: restoredWallet.privateKey || '',
+            mnemonic: mnemonic
+          };
+          setWallet(walletData);
+          localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(walletData));
+          return t.walletRestored(walletData.publicKey);
+        } catch (error) {
+          return t.walletRestoreFailed;
+        }
+      }
+    }
+
+    // Show restore instructions (EN + FR)
+    if (lowerInput.match(/^(restore|recover|import|restaurer|récupérer|importer)$/i)) {
+      return t.walletRestoreInstructions;
     }
 
     // Get faucet / request tokens (EN + FR)

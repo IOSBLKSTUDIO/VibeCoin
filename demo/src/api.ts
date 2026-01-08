@@ -35,6 +35,7 @@ export interface WalletData {
   address: string;
   publicKey: string;
   privateKey?: string;
+  mnemonic?: string;
 }
 
 export interface Balance {
@@ -101,6 +102,19 @@ class VibeCoinAPI {
   // Wallet
   async createWallet(): Promise<WalletData> {
     return this.fetch<WalletData>('/wallet/new', { method: 'POST' });
+  }
+
+  // Create wallet with BIP39 mnemonic seed phrase
+  async createWalletWithMnemonic(): Promise<WalletData> {
+    return this.fetch<WalletData>('/wallet/new-with-mnemonic', { method: 'POST' });
+  }
+
+  // Restore wallet from mnemonic
+  async restoreFromMnemonic(mnemonic: string): Promise<WalletData> {
+    return this.fetch<WalletData>('/wallet/from-mnemonic', {
+      method: 'POST',
+      body: JSON.stringify({ mnemonic }),
+    });
   }
 
   async getBalance(address: string): Promise<Balance> {

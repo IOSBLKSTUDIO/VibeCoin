@@ -252,10 +252,39 @@ export class API {
 
     // ==================== WALLET ====================
 
-    // Generate new wallet
+    // Generate new wallet (without mnemonic - backward compatible)
     this.app.post('/wallet/new', (_req: Request, res: Response) => {
       const wallet = new Wallet();
       res.json(wallet.exportWallet());
+    });
+
+    // Generate new wallet with BIP39 mnemonic seed phrase
+    this.app.post('/wallet/new-with-mnemonic', (_req: Request, res: Response) => {
+      const { wallet, mnemonic } = Wallet.createWithMnemonic();
+      res.json({
+        ...wallet.exportWallet(),
+        mnemonic
+      });
+    });
+
+    // Restore wallet from mnemonic
+    this.app.post('/wallet/from-mnemonic', (req: Request, res: Response) => {
+      try {
+        const { mnemonic } = req.body;
+
+        if (!mnemonic) {
+          return res.status(400).json({ error: 'mnemonic required' });
+        }
+
+        if (!Wallet.validateMnemonic(mnemonic)) {
+          return res.status(400).json({ error: 'Invalid mnemonic phrase. Must be 12 valid BIP39 words.' });
+        }
+
+        const wallet = Wallet.fromMnemonic(mnemonic);
+        res.json(wallet.exportWallet());
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
     });
 
     // Get wallet from private key
