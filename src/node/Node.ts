@@ -18,6 +18,10 @@ export interface NodeConfig {
     address?: string;
     interval: number;
   };
+  // Light node mode - only stores headers, syncs on demand
+  lightMode: boolean;
+  // External address for NAT traversal
+  externalAddress?: string;
 }
 
 const DEFAULT_CONFIG: NodeConfig = {
@@ -35,7 +39,8 @@ const DEFAULT_CONFIG: NodeConfig = {
   mining: {
     enabled: false,
     interval: 10000
-  }
+  },
+  lightMode: false
 };
 
 export class Node {
@@ -61,7 +66,12 @@ export class Node {
 
     this.api = new API(this.blockchain, this.storage, this.config.api);
 
-    this.p2p = new P2PNetwork(this.blockchain, this.storage, this.config.p2p);
+    // Pass network to P2P for proper seed node selection
+    this.p2p = new P2PNetwork(this.blockchain, this.storage, {
+      ...this.config.p2p,
+      network: this.config.network,
+      externalAddress: this.config.externalAddress
+    });
   }
 
   /**

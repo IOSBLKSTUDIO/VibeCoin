@@ -1,5 +1,11 @@
 /**
  * VibeCoin P2P Network - Peer-to-peer communication between nodes
+ *
+ * This is the heart of VibeCoin's decentralization. Each node running on
+ * someone's Mac or PC connects to other nodes, sharing the blockchain
+ * and keeping it synchronized across the entire network.
+ *
+ * Eco-friendly: Uses Proof of Vibe instead of energy-intensive mining
  */
 import WebSocket, { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +13,18 @@ import { Blockchain } from '../core/Blockchain';
 import { Block } from '../core/Block';
 import { Transaction } from '../core/Transaction';
 import { Storage } from '../storage/Storage';
+import {
+  getSeedNodes,
+  DISCOVERY_CONFIG,
+  NodeCapability,
+  NodeAdvertisement,
+  PeerScore,
+  calculatePeerScore
+} from './SeedNodes';
+
+// Version for protocol compatibility
+const PROTOCOL_VERSION = '1.0.0';
+const NODE_VERSION = '0.2.0';
 
 // Message types
 enum MessageType {
@@ -19,7 +37,13 @@ enum MessageType {
   GET_PEERS = 'GET_PEERS',
   PEERS = 'PEERS',
   PING = 'PING',
-  PONG = 'PONG'
+  PONG = 'PONG',
+  // New message types for enhanced P2P
+  NODE_ANNOUNCE = 'NODE_ANNOUNCE',
+  GET_NODE_INFO = 'GET_NODE_INFO',
+  NODE_INFO = 'NODE_INFO',
+  SYNC_REQUEST = 'SYNC_REQUEST',
+  SYNC_RESPONSE = 'SYNC_RESPONSE'
 }
 
 interface P2PMessage {
@@ -35,61 +59,108 @@ interface Peer {
   address: string;
   connected: boolean;
   lastSeen: number;
+  version: string;
+  blockHeight: number;
+  capabilities: NodeCapability[];
+  latency: number;
+  score: PeerScore;
 }
 
 export interface P2PConfig {
   port: number;
   maxPeers: number;
   seedNodes: string[];
+  network: 'mainnet' | 'testnet' | 'local';
+  externalAddress?: string;  // For NAT traversal
+  capabilities: NodeCapability[];
 }
 
 export class P2PNetwork {
   private server: WebSocketServer | null = null;
   private peers: Map<string, Peer> = new Map();
+  private knownPeers: Map<string, { lastSeen: number; score: number }> = new Map();
   private blockchain: Blockchain;
   private storage: Storage;
   private config: P2PConfig;
   private nodeId: string;
   private messageHandlers: Map<MessageType, (peer: Peer, data: any) => void> = new Map();
+  private discoveryInterval: NodeJS.Timeout | null = null;
+  private syncInProgress: boolean = false;
 
   constructor(blockchain: Blockchain, storage: Storage, config: Partial<P2PConfig> = {}) {
     this.blockchain = blockchain;
     this.storage = storage;
     this.nodeId = uuidv4();
+
+    // Default network to testnet
+    const network = config.network || 'testnet';
+
     this.config = {
       port: config.port || 6001,
-      maxPeers: config.maxPeers || 25,
-      seedNodes: config.seedNodes || []
+      maxPeers: config.maxPeers || DISCOVERY_CONFIG.MAX_PEERS,
+      seedNodes: config.seedNodes?.length ? config.seedNodes : getSeedNodes(network),
+      network: network,
+      externalAddress: config.externalAddress,
+      capabilities: config.capabilities || [NodeCapability.FULL_NODE]
     };
 
     this.setupMessageHandlers();
   }
 
   private setupMessageHandlers(): void {
-    // Handshake
+    // Handshake - enhanced with version and capabilities
     this.messageHandlers.set(MessageType.HANDSHAKE, (peer, data) => {
       peer.nodeId = data.nodeId;
-      console.log(`🤝 Handshake from ${peer.nodeId.substring(0, 8)}`);
+      peer.version = data.version || '0.1.0';
+      peer.blockHeight = data.height || 0;
+      peer.capabilities = data.capabilities || [NodeCapability.FULL_NODE];
+
+      console.log(`🤝 Handshake from ${peer.nodeId.substring(0, 8)} v${peer.version} (height: ${peer.blockHeight})`);
 
       this.sendToPeer(peer, {
         type: MessageType.HANDSHAKE_REPLY,
         data: {
           nodeId: this.nodeId,
+          version: NODE_VERSION,
+          protocolVersion: PROTOCOL_VERSION,
+          network: this.config.network,
           height: this.blockchain.chain.length,
-          latestHash: this.blockchain.getLatestBlock().hash
+          latestHash: this.blockchain.getLatestBlock().hash,
+          capabilities: this.config.capabilities
         }
       });
+
+      // Request peer list for discovery
+      setTimeout(() => {
+        this.sendToPeer(peer, { type: MessageType.GET_PEERS, data: {} });
+      }, 1000);
     });
 
-    // Handshake reply
+    // Handshake reply - enhanced
     this.messageHandlers.set(MessageType.HANDSHAKE_REPLY, (peer, data) => {
       peer.nodeId = data.nodeId;
-      console.log(`🤝 Connected to ${peer.nodeId.substring(0, 8)} (height: ${data.height})`);
+      peer.version = data.version || '0.1.0';
+      peer.blockHeight = data.height || 0;
+      peer.capabilities = data.capabilities || [NodeCapability.FULL_NODE];
+
+      console.log(`🤝 Connected to ${peer.nodeId.substring(0, 8)} v${peer.version} (height: ${data.height})`);
+
+      // Check network compatibility
+      if (data.network && data.network !== this.config.network) {
+        console.log(`⚠️  Network mismatch: we're on ${this.config.network}, peer is on ${data.network}`);
+        peer.ws.close();
+        return;
+      }
 
       // If peer has more blocks, request sync
       if (data.height > this.blockchain.chain.length) {
-        this.requestBlocks(peer, this.blockchain.chain.length);
+        this.requestSync(peer);
       }
+
+      // Request peer list for discovery
+      setTimeout(() => {
+        this.sendToPeer(peer, { type: MessageType.GET_PEERS, data: {} });
+      }, 1000);
     });
 
     // Block request
@@ -192,6 +263,91 @@ export class P2PNetwork {
     this.messageHandlers.set(MessageType.PONG, (peer) => {
       peer.lastSeen = Date.now();
     });
+
+    // Node announcement - for peer discovery
+    this.messageHandlers.set(MessageType.NODE_ANNOUNCE, (peer, data) => {
+      const { address, nodeId, height, capabilities } = data;
+      if (address && nodeId !== this.nodeId) {
+        this.knownPeers.set(address, {
+          lastSeen: Date.now(),
+          score: 0.5
+        });
+        // Try to connect if we need more peers
+        if (this.peers.size < DISCOVERY_CONFIG.MIN_PEERS) {
+          this.connectToPeer(address);
+        }
+      }
+    });
+
+    // Sync request - for initial blockchain sync
+    this.messageHandlers.set(MessageType.SYNC_REQUEST, async (peer, data) => {
+      const { fromHeight, toHeight } = data;
+      const blocks: any[] = [];
+
+      const maxBlocks = Math.min(toHeight - fromHeight, 100); // Max 100 blocks per request
+      for (let i = fromHeight; i < fromHeight + maxBlocks && i < this.blockchain.chain.length; i++) {
+        blocks.push(this.blockchain.chain[i].toJSON());
+      }
+
+      this.sendToPeer(peer, {
+        type: MessageType.SYNC_RESPONSE,
+        data: {
+          blocks,
+          hasMore: fromHeight + blocks.length < this.blockchain.chain.length,
+          totalHeight: this.blockchain.chain.length
+        }
+      });
+    });
+
+    // Sync response - receiving blocks during sync
+    this.messageHandlers.set(MessageType.SYNC_RESPONSE, async (peer, data) => {
+      const { blocks, hasMore, totalHeight } = data;
+
+      for (const blockData of blocks) {
+        const block = Block.fromJSON(blockData);
+        if (this.isValidNewBlock(block)) {
+          this.blockchain.chain.push(block);
+          peer.score.blocksReceived++;
+        } else {
+          peer.score.invalidBlocks++;
+        }
+      }
+
+      console.log(`📥 Synced ${blocks.length} blocks from ${peer.nodeId.substring(0, 8)} (${this.blockchain.chain.length}/${totalHeight})`);
+
+      // Request more if needed
+      if (hasMore && this.blockchain.chain.length < totalHeight) {
+        this.sendToPeer(peer, {
+          type: MessageType.SYNC_REQUEST,
+          data: {
+            fromHeight: this.blockchain.chain.length,
+            toHeight: totalHeight
+          }
+        });
+      } else {
+        this.syncInProgress = false;
+        await this.storage.saveBlockchain(this.blockchain);
+        console.log(`✅ Sync complete! Height: ${this.blockchain.chain.length}`);
+      }
+    });
+  }
+
+  /**
+   * Request sync from a peer
+   */
+  private requestSync(peer: Peer): void {
+    if (this.syncInProgress) return;
+
+    this.syncInProgress = true;
+    console.log(`🔄 Starting sync from ${peer.nodeId.substring(0, 8)}...`);
+
+    this.sendToPeer(peer, {
+      type: MessageType.SYNC_REQUEST,
+      data: {
+        fromHeight: this.blockchain.chain.length,
+        toHeight: peer.blockHeight
+      }
+    });
   }
 
   /**
@@ -207,20 +363,85 @@ export class P2PNetwork {
 
     console.log(`🔗 P2P server running on port ${this.config.port}`);
     console.log(`📍 Node ID: ${this.nodeId.substring(0, 8)}...`);
+    console.log(`🌐 Network: ${this.config.network}`);
 
-    // Connect to seed nodes
-    for (const seed of this.config.seedNodes) {
-      await this.connectToPeer(seed);
-    }
-
-    // Load saved peers
+    // Load saved peers first
     const savedPeers = await this.storage.loadPeers();
+    console.log(`📂 Loaded ${savedPeers.length} known peers from storage`);
+
+    // Try saved peers first
     for (const peer of savedPeers) {
       await this.connectToPeer(peer);
     }
 
+    // Connect to seed nodes
+    console.log(`🌱 Connecting to ${this.config.seedNodes.length} seed nodes...`);
+    for (const seed of this.config.seedNodes) {
+      const connected = await this.connectToPeer(seed);
+      if (connected) {
+        console.log(`   ✓ Connected to ${seed}`);
+      }
+    }
+
     // Start heartbeat
     setInterval(() => this.heartbeat(), 30000);
+
+    // Start peer discovery
+    this.startDiscovery();
+  }
+
+  /**
+   * Start automatic peer discovery
+   */
+  private startDiscovery(): void {
+    this.discoveryInterval = setInterval(() => {
+      // If we don't have enough peers, try to find more
+      if (this.peers.size < DISCOVERY_CONFIG.MIN_PEERS) {
+        console.log(`🔍 Low peer count (${this.peers.size}), discovering more...`);
+
+        // Try known peers
+        for (const [address] of this.knownPeers) {
+          if (!this.peers.has(address) && this.peers.size < this.config.maxPeers) {
+            this.connectToPeer(address);
+          }
+        }
+
+        // Try seed nodes again
+        for (const seed of this.config.seedNodes) {
+          if (!this.peers.has(seed)) {
+            this.connectToPeer(seed);
+          }
+        }
+      }
+
+      // Request peer lists from connected peers
+      for (const peer of this.peers.values()) {
+        if (peer.connected) {
+          this.sendToPeer(peer, { type: MessageType.GET_PEERS, data: {} });
+        }
+      }
+
+      // Announce ourselves to the network
+      this.announceNode();
+    }, DISCOVERY_CONFIG.PEER_EXCHANGE_INTERVAL);
+  }
+
+  /**
+   * Announce this node to all peers
+   */
+  private announceNode(): void {
+    const announcement = {
+      address: this.config.externalAddress || `localhost:${this.config.port}`,
+      nodeId: this.nodeId,
+      height: this.blockchain.chain.length,
+      capabilities: this.config.capabilities,
+      version: NODE_VERSION
+    };
+
+    this.broadcast({
+      type: MessageType.NODE_ANNOUNCE,
+      data: announcement
+    });
   }
 
   /**
@@ -266,7 +487,21 @@ export class P2PNetwork {
       nodeId: '',
       address,
       connected: true,
-      lastSeen: Date.now()
+      lastSeen: Date.now(),
+      version: '',
+      blockHeight: 0,
+      capabilities: [],
+      latency: 0,
+      score: {
+        address,
+        score: 0.5,
+        successfulConnections: 1,
+        failedConnections: 0,
+        blocksReceived: 0,
+        invalidBlocks: 0,
+        latency: 0,
+        lastUpdated: Date.now()
+      }
     };
 
     this.peers.set(address, peer);
@@ -296,14 +531,18 @@ export class P2PNetwork {
       this.peers.delete(address);
     });
 
-    // Send handshake
+    // Send handshake with enhanced info
     if (isOutbound) {
       this.sendToPeer(peer, {
         type: MessageType.HANDSHAKE,
         data: {
           nodeId: this.nodeId,
+          version: NODE_VERSION,
+          protocolVersion: PROTOCOL_VERSION,
+          network: this.config.network,
           height: this.blockchain.chain.length,
-          latestHash: this.blockchain.getLatestBlock().hash
+          latestHash: this.blockchain.getLatestBlock().hash,
+          capabilities: this.config.capabilities
         }
       });
     }
@@ -421,20 +660,65 @@ export class P2PNetwork {
   }
 
   /**
-   * Get peer list
+   * Get peer list with detailed info
    */
-  getPeers(): Array<{ nodeId: string; address: string; connected: boolean }> {
+  getPeers(): Array<{
+    nodeId: string;
+    address: string;
+    connected: boolean;
+    version: string;
+    blockHeight: number;
+    capabilities: NodeCapability[];
+  }> {
     return Array.from(this.peers.values()).map(p => ({
       nodeId: p.nodeId,
       address: p.address,
-      connected: p.connected
+      connected: p.connected,
+      version: p.version,
+      blockHeight: p.blockHeight,
+      capabilities: p.capabilities
     }));
+  }
+
+  /**
+   * Get network status
+   */
+  getNetworkStatus(): {
+    nodeId: string;
+    network: string;
+    version: string;
+    peers: number;
+    knownPeers: number;
+    syncStatus: string;
+    blockHeight: number;
+  } {
+    return {
+      nodeId: this.nodeId,
+      network: this.config.network,
+      version: NODE_VERSION,
+      peers: this.getPeerCount(),
+      knownPeers: this.knownPeers.size,
+      syncStatus: this.syncInProgress ? 'syncing' : 'synced',
+      blockHeight: this.blockchain.chain.length
+    };
+  }
+
+  /**
+   * Get node ID
+   */
+  getNodeId(): string {
+    return this.nodeId;
   }
 
   /**
    * Stop P2P server
    */
   async stop(): Promise<void> {
+    // Stop discovery
+    if (this.discoveryInterval) {
+      clearInterval(this.discoveryInterval);
+    }
+
     // Close all peer connections
     for (const peer of this.peers.values()) {
       peer.ws.close();

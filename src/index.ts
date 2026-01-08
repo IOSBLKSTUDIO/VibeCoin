@@ -35,6 +35,10 @@ export { P2PNetwork, P2PConfig } from './network/P2P';
 
 // Node
 export { Node, NodeConfig } from './node/Node';
+export { LightNode, LightNodeConfig } from './node/LightNode';
+
+// Network utilities
+export { getSeedNodes, getPublicSeedNodes, SEED_NODES, NodeCapability } from './network/SeedNodes';
 
 // Quick demo when running directly
 if (require.main === module) {

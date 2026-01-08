@@ -1215,6 +1215,71 @@ function App() {
         </div>
       </section>
 
+      {/* Run Your Node Section */}
+      <section className="node-section">
+        <h2 className="section-title">
+          <span className="title-icon">🖥️</span>
+          {language === 'fr' ? 'Faites Tourner Votre Nœud' : 'Run Your Own Node'}
+        </h2>
+        <p className="section-subtitle">
+          {language === 'fr'
+            ? 'Rejoignez le réseau décentralisé ! Chaque nœud renforce VibeCoin.'
+            : 'Join the decentralized network! Every node makes VibeCoin stronger.'}
+        </p>
+        <div className="node-options">
+          <div className="node-option-card full-node">
+            <div className="node-icon">🔷</div>
+            <h3>Full Node</h3>
+            <p>{language === 'fr'
+              ? 'Stocke toute la blockchain, peut miner et valider les transactions.'
+              : 'Stores the full blockchain, can mine and validate transactions.'}</p>
+            <div className="node-features">
+              <span className="node-feature">✓ {language === 'fr' ? 'Mining' : 'Mining'}</span>
+              <span className="node-feature">✓ {language === 'fr' ? 'Validation' : 'Validation'}</span>
+              <span className="node-feature">✓ API REST</span>
+            </div>
+            <div className="node-code">
+              <code>vibecoin --mine --miner new</code>
+            </div>
+          </div>
+          <div className="node-option-card light-node">
+            <div className="node-icon eco">🌱</div>
+            <h3>Light Node <span className="eco-badge">ECO</span></h3>
+            <p>{language === 'fr'
+              ? 'Mode écologique : stockage minimal, faible consommation CPU.'
+              : 'Eco mode: minimal storage, low CPU usage.'}</p>
+            <div className="node-features">
+              <span className="node-feature">✓ {language === 'fr' ? '99% moins de stockage' : '99% less storage'}</span>
+              <span className="node-feature">✓ {language === 'fr' ? 'Faible énergie' : 'Low power'}</span>
+              <span className="node-feature">✓ SPV</span>
+            </div>
+            <div className="node-code">
+              <code>vibecoin --light</code>
+            </div>
+          </div>
+        </div>
+        <div className="node-install">
+          <h4>{language === 'fr' ? 'Installation en une ligne' : 'One-Line Install'}</h4>
+          <div className="install-tabs">
+            <div className="install-tab">
+              <span className="tab-label">Mac/Linux</span>
+              <div className="install-code">
+                <code>curl -fsSL https://raw.githubusercontent.com/IOSBLKSTUDIO/VibeCoin/master/scripts/install.sh | bash</code>
+              </div>
+            </div>
+            <div className="install-tab">
+              <span className="tab-label">Windows</span>
+              <div className="install-code">
+                <code>iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/IOSBLKSTUDIO/VibeCoin/master/scripts/install.ps1'))</code>
+              </div>
+            </div>
+          </div>
+          <a href="https://github.com/IOSBLKSTUDIO/VibeCoin/blob/master/docs/RUNNING_A_NODE.md" target="_blank" rel="noopener noreferrer" className="docs-link">
+            📖 {language === 'fr' ? 'Documentation complète' : 'Full Documentation'}
+          </a>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="final-cta-section">
         <div className="cta-card">
