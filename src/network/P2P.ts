@@ -21,6 +21,7 @@ import {
   PeerScore,
   calculatePeerScore
 } from './SeedNodes';
+import { ChainValidator } from '../core/ChainValidator';
 
 // Version for protocol compatibility
 const PROTOCOL_VERSION = '1.0.0';
@@ -614,20 +615,50 @@ export class P2PNetwork {
   }
 
   /**
-   * Validate new block
+   * Validate new block using ChainValidator
+   * This ensures no one (including creators) can inject invalid blocks
    */
   private isValidNewBlock(block: Block): boolean {
     const latestBlock = this.blockchain.getLatestBlock();
 
+    // Basic structure checks
     if (block.index !== latestBlock.index + 1) {
+      console.log(`❌ Block ${block.index} rejected: wrong index (expected ${latestBlock.index + 1})`);
       return false;
     }
 
     if (block.previousHash !== latestBlock.hash) {
+      console.log(`❌ Block ${block.index} rejected: invalid previous hash`);
       return false;
     }
 
+    // Use ChainValidator for thorough validation
+    const validationResult = ChainValidator.validateBlock(block, latestBlock, block.index);
+    if (!validationResult.valid) {
+      console.log(`❌ Block ${block.index} rejected by ChainValidator: ${validationResult.message}`);
+      return false;
+    }
+
+    // Verify proof of work
     if (!block.isValid()) {
+      console.log(`❌ Block ${block.index} rejected: invalid proof of work`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Validate entire chain received from peer
+   * Prevents accepting corrupted chains
+   */
+  private validateReceivedChain(chain: Block[]): boolean {
+    const tempBlockchain = new Blockchain();
+    tempBlockchain.chain = chain;
+
+    const result = ChainValidator.validateChain(tempBlockchain);
+    if (!result.valid) {
+      console.log(`❌ Received chain rejected: ${result.message}`);
       return false;
     }
 

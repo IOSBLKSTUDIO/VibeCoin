@@ -40,6 +40,15 @@ export { LightNode, LightNodeConfig } from './node/LightNode';
 // Network utilities
 export { getSeedNodes, getPublicSeedNodes, SEED_NODES, NodeCapability } from './network/SeedNodes';
 
+// Chain validation & security
+export {
+  ChainValidator,
+  ValidationError,
+  ValidationResult,
+  CONSENSUS_RULES,
+  CHECKPOINTS
+} from './core/ChainValidator';
+
 // Quick demo when running directly
 if (require.main === module) {
   const { Blockchain } = require('./core/Blockchain');
