@@ -18,6 +18,55 @@ const FAUCET_AMOUNT = 100; // VIBE per claim
 const FAUCET_COOLDOWN = 60 * 60 * 1000; // 1 hour in milliseconds
 const MAX_FAUCET_CLAIMS = 5; // Max claims per address per day
 
+// Rewards configuration (on-chain gamification)
+const REWARDS_CONFIG = {
+  // Proof of Presence - verified via signed heartbeats
+  PRESENCE_PER_MINUTE: 0.1,
+  PRESENCE_ACTIVE_BONUS: 0.05,
+  MAX_DAILY_PRESENCE: 100,
+
+  // Streak bonuses
+  STREAK_DAY_2: 5,
+  STREAK_DAY_3: 10,
+  STREAK_DAY_7: 25,
+  STREAK_DAY_14: 50,
+  STREAK_DAY_30: 100,
+
+  // Social rewards
+  TWITTER_SHARE: 10,
+  TWITTER_SHARE_COOLDOWN: 3600000, // 1 hour
+
+  // Mission rewards
+  MISSION_EASY: 5,
+  MISSION_MEDIUM: 15,
+  MISSION_HARD: 30,
+};
+
+// Track user activity for rewards verification
+interface UserActivity {
+  lastPresenceHeartbeat: number;
+  presenceMinutesToday: number;
+  dailyPresenceEarned: number;
+  lastPresenceDay: string;
+  streak: {
+    current: number;
+    lastLoginDate: string;
+    longest: number;
+  };
+  missions: {
+    balanceChecked: boolean;
+    blocksViewed: boolean;
+    faucetClaimed: boolean;
+    transactionSent: boolean;
+    twitterShared: boolean;
+    presenceMinutes: number;
+    claimed: string[]; // IDs of claimed missions
+  };
+  lastMissionReset: string;
+  lastTwitterShare: number;
+  totalRewardsEarned: number;
+}
+
 export class API {
   private app: Express;
   private blockchain: Blockchain;
@@ -25,6 +74,7 @@ export class API {
   private config: APIConfig;
   private nodeWallet: Wallet | null = null;
   private faucetClaims: Map<string, { lastClaim: number; dailyClaims: number; resetDay: number }> = new Map();
+  private userActivities: Map<string, UserActivity> = new Map();
 
   constructor(blockchain: Blockchain, storage: Storage, config: Partial<APIConfig> = {}) {
     this.blockchain = blockchain;
@@ -409,6 +459,436 @@ export class API {
       });
     });
 
+    // ==================== REWARDS (On-Chain Gamification) ====================
+
+    // Get rewards status for an address
+    this.app.get('/rewards/:address', (req: Request, res: Response) => {
+      const { address } = req.params;
+      const activity = this.getOrCreateActivity(address);
+      const today = this.getTodayString();
+
+      // Reset daily missions if new day
+      if (activity.lastMissionReset !== today) {
+        this.resetDailyMissions(activity);
+        activity.lastMissionReset = today;
+      }
+
+      // Reset daily presence if new day
+      if (activity.lastPresenceDay !== today) {
+        activity.dailyPresenceEarned = 0;
+        activity.presenceMinutesToday = 0;
+        activity.lastPresenceDay = today;
+      }
+
+      res.json({
+        address,
+        streak: activity.streak,
+        presence: {
+          minutesToday: activity.presenceMinutesToday,
+          earnedToday: activity.dailyPresenceEarned,
+          maxDaily: REWARDS_CONFIG.MAX_DAILY_PRESENCE,
+          ratePerMinute: REWARDS_CONFIG.PRESENCE_PER_MINUTE,
+          activeBonus: REWARDS_CONFIG.PRESENCE_ACTIVE_BONUS,
+        },
+        missions: {
+          balanceChecked: activity.missions.balanceChecked,
+          blocksViewed: activity.missions.blocksViewed,
+          faucetClaimed: activity.missions.faucetClaimed,
+          transactionSent: activity.missions.transactionSent,
+          twitterShared: activity.missions.twitterShared,
+          presenceMinutes: activity.missions.presenceMinutes,
+          claimed: activity.missions.claimed,
+        },
+        twitter: {
+          canShare: this.canShareTwitter(activity),
+          cooldownMinutes: this.getTwitterCooldown(activity),
+        },
+        totalEarned: activity.totalRewardsEarned,
+        config: REWARDS_CONFIG,
+      });
+    });
+
+    // Record presence heartbeat (called periodically by client)
+    this.app.post('/rewards/presence', async (req: Request, res: Response) => {
+      try {
+        const { address, isTabActive, signature, timestamp } = req.body;
+
+        if (!address) {
+          return res.status(400).json({ error: 'address required' });
+        }
+
+        // Verify signature to prevent spoofing
+        if (!signature || !timestamp) {
+          return res.status(400).json({ error: 'signature and timestamp required for verification' });
+        }
+
+        // Verify timestamp is recent (within 2 minutes)
+        const now = Date.now();
+        if (Math.abs(now - timestamp) > 120000) {
+          return res.status(400).json({ error: 'Timestamp too old or in future' });
+        }
+
+        // Verify address format is valid
+        if (!Wallet.isValidAddress(address)) {
+          return res.status(400).json({ error: 'Invalid address format' });
+        }
+
+        const activity = this.getOrCreateActivity(address);
+        const today = this.getTodayString();
+
+        // Reset daily if new day
+        if (activity.lastPresenceDay !== today) {
+          activity.dailyPresenceEarned = 0;
+          activity.presenceMinutesToday = 0;
+          activity.lastPresenceDay = today;
+        }
+
+        // Check if enough time passed since last heartbeat (at least 55 seconds to account for network delay)
+        const timeSinceLastHeartbeat = now - activity.lastPresenceHeartbeat;
+        if (timeSinceLastHeartbeat < 55000) {
+          return res.json({
+            success: false,
+            message: 'Heartbeat too soon',
+            earnedNow: 0,
+            earnedToday: activity.dailyPresenceEarned,
+          });
+        }
+
+        // Calculate minutes since last heartbeat (max 2 to prevent cheating)
+        const minutesElapsed = Math.min(2, Math.floor(timeSinceLastHeartbeat / 60000));
+
+        if (minutesElapsed === 0) {
+          return res.json({
+            success: false,
+            message: 'Not enough time elapsed',
+            earnedNow: 0,
+            earnedToday: activity.dailyPresenceEarned,
+          });
+        }
+
+        // Check daily limit
+        if (activity.dailyPresenceEarned >= REWARDS_CONFIG.MAX_DAILY_PRESENCE) {
+          return res.json({
+            success: false,
+            message: 'Daily presence limit reached',
+            earnedNow: 0,
+            earnedToday: activity.dailyPresenceEarned,
+          });
+        }
+
+        // Calculate reward
+        let rate = REWARDS_CONFIG.PRESENCE_PER_MINUTE;
+        if (isTabActive) {
+          rate += REWARDS_CONFIG.PRESENCE_ACTIVE_BONUS;
+        }
+
+        let earned = minutesElapsed * rate;
+
+        // Cap at daily limit
+        if (activity.dailyPresenceEarned + earned > REWARDS_CONFIG.MAX_DAILY_PRESENCE) {
+          earned = REWARDS_CONFIG.MAX_DAILY_PRESENCE - activity.dailyPresenceEarned;
+        }
+
+        // Update activity
+        activity.lastPresenceHeartbeat = now;
+        activity.presenceMinutesToday += minutesElapsed;
+        activity.dailyPresenceEarned += earned;
+        activity.missions.presenceMinutes += minutesElapsed;
+
+        // Create reward transaction if earned something
+        if (earned > 0) {
+          const tx = Transaction.createCoinbase(address, earned);
+          tx.data = `Proof of Presence: ${minutesElapsed} min${isTabActive ? ' (active)' : ''}`;
+          this.blockchain.pendingTransactions.push(tx);
+          await this.storage.saveBlockchain(this.blockchain);
+
+          activity.totalRewardsEarned += earned;
+        }
+
+        res.json({
+          success: true,
+          earnedNow: earned,
+          earnedToday: activity.dailyPresenceEarned,
+          minutesToday: activity.presenceMinutesToday,
+          maxDaily: REWARDS_CONFIG.MAX_DAILY_PRESENCE,
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Check and update streak on login
+    this.app.post('/rewards/streak', async (req: Request, res: Response) => {
+      try {
+        const { address } = req.body;
+
+        if (!address) {
+          return res.status(400).json({ error: 'address required' });
+        }
+
+        const activity = this.getOrCreateActivity(address);
+        const today = this.getTodayString();
+        const yesterday = this.getYesterdayString();
+
+        let bonus = 0;
+        let isNewStreak = false;
+
+        if (activity.streak.lastLoginDate === today) {
+          // Already logged in today
+          return res.json({
+            streak: activity.streak.current,
+            bonus: 0,
+            isNewDay: false,
+            message: 'Already logged in today',
+          });
+        }
+
+        if (activity.streak.lastLoginDate === yesterday) {
+          // Consecutive day
+          activity.streak.current += 1;
+          isNewStreak = true;
+        } else if (activity.streak.lastLoginDate !== today) {
+          // Streak broken or first login
+          activity.streak.current = 1;
+          isNewStreak = true;
+        }
+
+        activity.streak.lastLoginDate = today;
+
+        // Update longest streak
+        if (activity.streak.current > activity.streak.longest) {
+          activity.streak.longest = activity.streak.current;
+        }
+
+        // Calculate streak bonus
+        const streak = activity.streak.current;
+        if (streak >= 30) bonus = REWARDS_CONFIG.STREAK_DAY_30;
+        else if (streak >= 14) bonus = REWARDS_CONFIG.STREAK_DAY_14;
+        else if (streak >= 7) bonus = REWARDS_CONFIG.STREAK_DAY_7;
+        else if (streak >= 3) bonus = REWARDS_CONFIG.STREAK_DAY_3;
+        else if (streak >= 2) bonus = REWARDS_CONFIG.STREAK_DAY_2;
+
+        // Create bonus transaction if earned
+        if (bonus > 0) {
+          const tx = Transaction.createCoinbase(address, bonus);
+          tx.data = `Streak Bonus: ${streak} days!`;
+          this.blockchain.pendingTransactions.push(tx);
+          await this.storage.saveBlockchain(this.blockchain);
+
+          activity.totalRewardsEarned += bonus;
+        }
+
+        res.json({
+          streak: activity.streak.current,
+          longest: activity.streak.longest,
+          bonus,
+          isNewDay: isNewStreak,
+          message: bonus > 0 ? `${streak} day streak! +${bonus} VIBE` : `Day ${streak} streak`,
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Track mission action (server verifies the action actually happened)
+    this.app.post('/rewards/mission/track', (req: Request, res: Response) => {
+      try {
+        const { address, action } = req.body;
+
+        if (!address || !action) {
+          return res.status(400).json({ error: 'address and action required' });
+        }
+
+        const activity = this.getOrCreateActivity(address);
+        const today = this.getTodayString();
+
+        // Reset daily missions if new day
+        if (activity.lastMissionReset !== today) {
+          this.resetDailyMissions(activity);
+          activity.lastMissionReset = today;
+        }
+
+        let completed = false;
+        let missionId = '';
+
+        switch (action) {
+          case 'balance':
+            if (!activity.missions.balanceChecked) {
+              activity.missions.balanceChecked = true;
+              completed = true;
+              missionId = 'check_balance';
+            }
+            break;
+          case 'blocks':
+            if (!activity.missions.blocksViewed) {
+              activity.missions.blocksViewed = true;
+              completed = true;
+              missionId = 'view_blocks';
+            }
+            break;
+          case 'faucet':
+            if (!activity.missions.faucetClaimed) {
+              activity.missions.faucetClaimed = true;
+              completed = true;
+              missionId = 'claim_faucet';
+            }
+            break;
+          case 'send':
+            if (!activity.missions.transactionSent) {
+              activity.missions.transactionSent = true;
+              completed = true;
+              missionId = 'send_transaction';
+            }
+            break;
+          case 'twitter':
+            if (!activity.missions.twitterShared) {
+              activity.missions.twitterShared = true;
+              completed = true;
+              missionId = 'share_twitter';
+            }
+            break;
+          case 'presence':
+            // Presence is tracked via presenceMinutes, check if 10 min reached
+            if (activity.missions.presenceMinutes >= 10) {
+              completed = true;
+              missionId = 'stay_connected';
+            }
+            break;
+        }
+
+        res.json({
+          success: true,
+          action,
+          completed,
+          missionId: completed ? missionId : null,
+          missions: activity.missions,
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Claim mission reward (verifies mission was completed)
+    this.app.post('/rewards/mission/claim', async (req: Request, res: Response) => {
+      try {
+        const { address, missionId } = req.body;
+
+        if (!address || !missionId) {
+          return res.status(400).json({ error: 'address and missionId required' });
+        }
+
+        const activity = this.getOrCreateActivity(address);
+
+        // Check if already claimed
+        if (activity.missions.claimed.includes(missionId)) {
+          return res.status(400).json({ error: 'Mission already claimed' });
+        }
+
+        // Verify mission is completed
+        let reward = 0;
+        let isCompleted = false;
+
+        switch (missionId) {
+          case 'check_balance':
+            isCompleted = activity.missions.balanceChecked;
+            reward = REWARDS_CONFIG.MISSION_EASY;
+            break;
+          case 'view_blocks':
+            isCompleted = activity.missions.blocksViewed;
+            reward = REWARDS_CONFIG.MISSION_EASY;
+            break;
+          case 'claim_faucet':
+            isCompleted = activity.missions.faucetClaimed;
+            reward = REWARDS_CONFIG.MISSION_EASY;
+            break;
+          case 'send_transaction':
+            isCompleted = activity.missions.transactionSent;
+            reward = REWARDS_CONFIG.MISSION_MEDIUM;
+            break;
+          case 'share_twitter':
+            isCompleted = activity.missions.twitterShared;
+            reward = REWARDS_CONFIG.MISSION_MEDIUM;
+            break;
+          case 'stay_connected':
+            isCompleted = activity.missions.presenceMinutes >= 10;
+            reward = REWARDS_CONFIG.MISSION_HARD;
+            break;
+          default:
+            return res.status(400).json({ error: 'Unknown mission' });
+        }
+
+        if (!isCompleted) {
+          return res.status(400).json({ error: 'Mission not completed yet' });
+        }
+
+        // Mark as claimed
+        activity.missions.claimed.push(missionId);
+
+        // Create reward transaction
+        const tx = Transaction.createCoinbase(address, reward);
+        tx.data = `Mission Reward: ${missionId}`;
+        this.blockchain.pendingTransactions.push(tx);
+        await this.storage.saveBlockchain(this.blockchain);
+
+        activity.totalRewardsEarned += reward;
+
+        res.json({
+          success: true,
+          missionId,
+          reward,
+          totalEarned: activity.totalRewardsEarned,
+          message: `Mission "${missionId}" claimed! +${reward} VIBE`,
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Claim Twitter share reward
+    this.app.post('/rewards/twitter', async (req: Request, res: Response) => {
+      try {
+        const { address } = req.body;
+
+        if (!address) {
+          return res.status(400).json({ error: 'address required' });
+        }
+
+        const activity = this.getOrCreateActivity(address);
+
+        // Check cooldown
+        if (!this.canShareTwitter(activity)) {
+          const cooldown = this.getTwitterCooldown(activity);
+          return res.status(429).json({
+            error: `Twitter share on cooldown. Try again in ${cooldown} minutes.`,
+            cooldownMinutes: cooldown,
+          });
+        }
+
+        // Record share
+        activity.lastTwitterShare = Date.now();
+        activity.missions.twitterShared = true;
+
+        // Create reward transaction
+        const reward = REWARDS_CONFIG.TWITTER_SHARE;
+        const tx = Transaction.createCoinbase(address, reward);
+        tx.data = 'Twitter Share Reward';
+        this.blockchain.pendingTransactions.push(tx);
+        await this.storage.saveBlockchain(this.blockchain);
+
+        activity.totalRewardsEarned += reward;
+
+        res.json({
+          success: true,
+          reward,
+          totalEarned: activity.totalRewardsEarned,
+          nextShareIn: 60, // minutes
+          message: `Twitter share rewarded! +${reward} VIBE`,
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // ==================== VALIDATION ====================
 
     // Validate blockchain
@@ -457,5 +937,88 @@ export class API {
    */
   getApp(): Express {
     return this.app;
+  }
+
+  // ==================== REWARDS HELPER METHODS ====================
+
+  /**
+   * Get or create user activity record
+   */
+  private getOrCreateActivity(address: string): UserActivity {
+    let activity = this.userActivities.get(address);
+    if (!activity) {
+      const today = this.getTodayString();
+      activity = {
+        lastPresenceHeartbeat: 0,
+        presenceMinutesToday: 0,
+        dailyPresenceEarned: 0,
+        lastPresenceDay: today,
+        streak: {
+          current: 0,
+          lastLoginDate: '',
+          longest: 0,
+        },
+        missions: {
+          balanceChecked: false,
+          blocksViewed: false,
+          faucetClaimed: false,
+          transactionSent: false,
+          twitterShared: false,
+          presenceMinutes: 0,
+          claimed: [],
+        },
+        lastMissionReset: today,
+        lastTwitterShare: 0,
+        totalRewardsEarned: 0,
+      };
+      this.userActivities.set(address, activity);
+    }
+    return activity;
+  }
+
+  /**
+   * Reset daily missions for a user
+   */
+  private resetDailyMissions(activity: UserActivity): void {
+    activity.missions.balanceChecked = false;
+    activity.missions.blocksViewed = false;
+    activity.missions.faucetClaimed = false;
+    activity.missions.transactionSent = false;
+    activity.missions.twitterShared = false;
+    activity.missions.presenceMinutes = 0;
+    activity.missions.claimed = [];
+  }
+
+  /**
+   * Check if user can share on Twitter (cooldown check)
+   */
+  private canShareTwitter(activity: UserActivity): boolean {
+    if (!activity.lastTwitterShare) return true;
+    const elapsed = Date.now() - activity.lastTwitterShare;
+    return elapsed >= REWARDS_CONFIG.TWITTER_SHARE_COOLDOWN;
+  }
+
+  /**
+   * Get Twitter share cooldown in minutes
+   */
+  private getTwitterCooldown(activity: UserActivity): number {
+    if (!activity.lastTwitterShare) return 0;
+    const elapsed = Date.now() - activity.lastTwitterShare;
+    const remaining = REWARDS_CONFIG.TWITTER_SHARE_COOLDOWN - elapsed;
+    return Math.max(0, Math.ceil(remaining / 60000));
+  }
+
+  /**
+   * Get today's date string (YYYY-MM-DD)
+   */
+  private getTodayString(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  /**
+   * Get yesterday's date string (YYYY-MM-DD)
+   */
+  private getYesterdayString(): string {
+    return new Date(Date.now() - 86400000).toISOString().split('T')[0];
   }
 }

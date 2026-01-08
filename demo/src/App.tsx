@@ -4,7 +4,6 @@ import type { NodeInfo, Block } from './api';
 import { API_URL, TOKEN, REFRESH_INTERVAL } from './config';
 import { exportWalletToFile, importWalletFromFile } from './crypto';
 import { RewardsPanel } from './RewardsPanel';
-import { initStreakState, updateMissionProgress, initMissionsState, saveMissionsState } from './rewards';
 import './App.css';
 
 type View = 'chat' | 'explorer' | 'wallet' | 'whitepaper';
@@ -155,11 +154,14 @@ function App() {
   const [showRewards, setShowRewards] = useState(false);
   const [streakCount, setStreakCount] = useState(0);
 
-  // Load streak count on mount
+  // Load streak count from API on mount (when wallet is available)
   useEffect(() => {
-    const streak = initStreakState();
-    setStreakCount(streak.currentStreak);
-  }, []);
+    if (wallet?.publicKey) {
+      api.getRewardsStatus(wallet.publicKey)
+        .then(status => setStreakCount(status.streak.current))
+        .catch(() => setStreakCount(0));
+    }
+  }, [wallet?.publicKey]);
 
   // Load wallet, language and chat history from localStorage
   useEffect(() => {
@@ -280,16 +282,32 @@ function App() {
     return message;
   };
 
-  // Track mission progress
-  const trackMission = (action: string) => {
-    const missions = initMissionsState();
-    const { state: newState, completed } = updateMissionProgress(missions, action);
-    saveMissionsState(newState);
-    if (completed) {
-      const missionName = language === 'fr' ? completed.titleFr : completed.title;
-      addMessage('system', language === 'fr'
-        ? `🎉 Mission complétée : "${missionName}" ! Ouvre les Récompenses pour réclamer +${completed.reward} VIBE`
-        : `🎉 Mission completed: "${missionName}"! Open Rewards to claim +${completed.reward} VIBE`);
+  // Track mission progress (on-chain via API)
+  const trackMission = async (action: string) => {
+    if (!wallet?.publicKey) return;
+
+    try {
+      const response = await api.trackMission(wallet.publicKey, action);
+      if (response.completed && response.missionId) {
+        // Mission completed notification
+        const missionNames: Record<string, { en: string; fr: string }> = {
+          check_balance: { en: 'Check your balance', fr: 'Vérifier ton solde' },
+          view_blocks: { en: 'Explore the blockchain', fr: 'Explorer la blockchain' },
+          claim_faucet: { en: 'Claim from faucet', fr: 'Réclamer au faucet' },
+          send_transaction: { en: 'Make a transaction', fr: 'Effectuer une transaction' },
+          share_twitter: { en: 'Share on Twitter/X', fr: 'Partager sur Twitter/X' },
+          stay_connected: { en: 'Stay connected 10 min', fr: 'Rester connecté 10 min' },
+        };
+        const mission = missionNames[response.missionId];
+        if (mission) {
+          const missionName = language === 'fr' ? mission.fr : mission.en;
+          addMessage('system', language === 'fr'
+            ? `🎉 Mission complétée : "${missionName}" ! Ouvre les Récompenses pour réclamer ta récompense VIBE`
+            : `🎉 Mission completed: "${missionName}"! Open Rewards to claim your VIBE reward`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to track mission:', err);
     }
   };
 

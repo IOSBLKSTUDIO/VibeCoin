@@ -146,6 +146,150 @@ class VibeCoinAPI {
       return false;
     }
   }
+
+  // ==================== REWARDS API (On-Chain Gamification) ====================
+
+  // Get rewards status for an address
+  async getRewardsStatus(address: string): Promise<RewardsStatus> {
+    return this.fetch<RewardsStatus>(`/rewards/${address}`);
+  }
+
+  // Record presence heartbeat
+  async recordPresence(address: string, isTabActive: boolean): Promise<PresenceResponse> {
+    const timestamp = Date.now();
+    const signature = `${address}:${timestamp}`; // Simple signature for now
+    return this.fetch<PresenceResponse>('/rewards/presence', {
+      method: 'POST',
+      body: JSON.stringify({ address, isTabActive, signature, timestamp }),
+    });
+  }
+
+  // Check and update streak on login
+  async updateStreak(address: string): Promise<StreakResponse> {
+    return this.fetch<StreakResponse>('/rewards/streak', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    });
+  }
+
+  // Track mission action
+  async trackMission(address: string, action: string): Promise<MissionTrackResponse> {
+    return this.fetch<MissionTrackResponse>('/rewards/mission/track', {
+      method: 'POST',
+      body: JSON.stringify({ address, action }),
+    });
+  }
+
+  // Claim mission reward
+  async claimMission(address: string, missionId: string): Promise<MissionClaimResponse> {
+    return this.fetch<MissionClaimResponse>('/rewards/mission/claim', {
+      method: 'POST',
+      body: JSON.stringify({ address, missionId }),
+    });
+  }
+
+  // Claim Twitter share reward
+  async claimTwitterReward(address: string): Promise<TwitterRewardResponse> {
+    return this.fetch<TwitterRewardResponse>('/rewards/twitter', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    });
+  }
+}
+
+// Rewards API types
+export interface RewardsStatus {
+  address: string;
+  streak: {
+    current: number;
+    lastLoginDate: string;
+    longest: number;
+  };
+  presence: {
+    minutesToday: number;
+    earnedToday: number;
+    maxDaily: number;
+    ratePerMinute: number;
+    activeBonus: number;
+  };
+  missions: {
+    balanceChecked: boolean;
+    blocksViewed: boolean;
+    faucetClaimed: boolean;
+    transactionSent: boolean;
+    twitterShared: boolean;
+    presenceMinutes: number;
+    claimed: string[];
+  };
+  twitter: {
+    canShare: boolean;
+    cooldownMinutes: number;
+  };
+  totalEarned: number;
+  config: {
+    PRESENCE_PER_MINUTE: number;
+    PRESENCE_ACTIVE_BONUS: number;
+    MAX_DAILY_PRESENCE: number;
+    STREAK_DAY_2: number;
+    STREAK_DAY_3: number;
+    STREAK_DAY_7: number;
+    STREAK_DAY_14: number;
+    STREAK_DAY_30: number;
+    TWITTER_SHARE: number;
+    TWITTER_SHARE_COOLDOWN: number;
+    MISSION_EASY: number;
+    MISSION_MEDIUM: number;
+    MISSION_HARD: number;
+  };
+}
+
+export interface PresenceResponse {
+  success: boolean;
+  message?: string;
+  earnedNow: number;
+  earnedToday: number;
+  minutesToday?: number;
+  maxDaily?: number;
+}
+
+export interface StreakResponse {
+  streak: number;
+  longest?: number;
+  bonus: number;
+  isNewDay: boolean;
+  message: string;
+}
+
+export interface MissionTrackResponse {
+  success: boolean;
+  action: string;
+  completed: boolean;
+  missionId: string | null;
+  missions: {
+    balanceChecked: boolean;
+    blocksViewed: boolean;
+    faucetClaimed: boolean;
+    transactionSent: boolean;
+    twitterShared: boolean;
+    presenceMinutes: number;
+    claimed: string[];
+  };
+}
+
+export interface MissionClaimResponse {
+  success: boolean;
+  missionId: string;
+  reward: number;
+  totalEarned: number;
+  message: string;
+}
+
+export interface TwitterRewardResponse {
+  success: boolean;
+  reward: number;
+  totalEarned: number;
+  nextShareIn: number;
+  message: string;
 }
 
 export const api = new VibeCoinAPI();
