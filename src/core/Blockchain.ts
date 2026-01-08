@@ -22,7 +22,8 @@ export const BLOCKCHAIN_CONFIG = {
 
   // Transactions
   MIN_FEE: 0.001,
-  MAX_TRANSACTIONS_PER_BLOCK: 100
+  MAX_TRANSACTIONS_PER_BLOCK: 100,
+  MAX_PENDING_TRANSACTIONS: 1000 // Limit mempool size
 };
 
 /**
@@ -94,6 +95,12 @@ export class Blockchain {
 
     if (!transaction.isCoinbase() && totalPending > balance) {
       console.log('❌ Double spending detected in pending transactions');
+      return false;
+    }
+
+    // Check mempool size limit
+    if (this.pendingTransactions.length >= BLOCKCHAIN_CONFIG.MAX_PENDING_TRANSACTIONS) {
+      console.log('❌ Transaction pool is full. Please wait for next block.');
       return false;
     }
 

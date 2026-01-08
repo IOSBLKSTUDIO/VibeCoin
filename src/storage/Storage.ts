@@ -289,6 +289,59 @@ export class Storage {
     }
   }
 
+  // ==================== USER ACTIVITY (Rewards) ====================
+
+  /**
+   * Save user activity data for rewards system
+   */
+  async saveUserActivity(address: string, activity: object): Promise<void> {
+    await this.db.put(`activity:${address}`, JSON.stringify(activity));
+  }
+
+  /**
+   * Load user activity data
+   */
+  async loadUserActivity(address: string): Promise<object | null> {
+    try {
+      const data = await this.db.get(`activity:${address}`);
+      return JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Save all user activities (batch operation)
+   */
+  async saveAllUserActivities(activities: Map<string, object>): Promise<void> {
+    const batch = this.db.batch();
+    for (const [address, activity] of activities) {
+      batch.put(`activity:${address}`, JSON.stringify(activity));
+    }
+    await batch.write();
+  }
+
+  /**
+   * Load all user activities
+   */
+  async loadAllUserActivities(): Promise<Map<string, object>> {
+    const activities = new Map<string, object>();
+
+    for await (const [key, value] of this.db.iterator({
+      gte: 'activity:',
+      lte: 'activity:\xFF'
+    })) {
+      const address = key.replace('activity:', '');
+      try {
+        activities.set(address, JSON.parse(value));
+      } catch {
+        // Skip invalid data
+      }
+    }
+
+    return activities;
+  }
+
   // ==================== UTILITIES ====================
 
   /**

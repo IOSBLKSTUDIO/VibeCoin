@@ -75,6 +75,7 @@ export class API {
   private nodeWallet: Wallet | null = null;
   private faucetClaims: Map<string, { lastClaim: number; dailyClaims: number; resetDay: number }> = new Map();
   private userActivities: Map<string, UserActivity> = new Map();
+  private activitySaveTimeout: NodeJS.Timeout | null = null;
 
   constructor(blockchain: Blockchain, storage: Storage, config: Partial<APIConfig> = {}) {
     this.blockchain = blockchain;
@@ -87,6 +88,45 @@ export class API {
     this.app = express();
     this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  /**
+   * Initialize API - load persisted data
+   */
+  async init(): Promise<void> {
+    // Load user activities from storage
+    const activities = await this.storage.loadAllUserActivities();
+    for (const [address, activity] of activities) {
+      this.userActivities.set(address, activity as UserActivity);
+    }
+    console.log(`📊 Loaded ${this.userActivities.size} user activities from storage`);
+  }
+
+  /**
+   * Schedule activity save (debounced to avoid too many writes)
+   */
+  private scheduleActivitySave(): void {
+    if (this.activitySaveTimeout) {
+      clearTimeout(this.activitySaveTimeout);
+    }
+    this.activitySaveTimeout = setTimeout(async () => {
+      try {
+        await this.storage.saveAllUserActivities(this.userActivities as Map<string, object>);
+        console.log(`💾 User activities saved (${this.userActivities.size} users)`);
+      } catch (error) {
+        console.error('Failed to save user activities:', error);
+      }
+    }, 5000); // Save after 5 seconds of inactivity
+  }
+
+  /**
+   * Save a single user's activity immediately
+   */
+  private async saveUserActivity(address: string): Promise<void> {
+    const activity = this.userActivities.get(address);
+    if (activity) {
+      await this.storage.saveUserActivity(address, activity);
+    }
   }
 
   private setupMiddleware(): void {
@@ -182,6 +222,25 @@ export class API {
 
         if (!from || !to || amount === undefined) {
           return res.status(400).json({ error: 'Missing required fields: from, to, amount' });
+        }
+
+        // Validate amount
+        const numAmount = Number(amount);
+        if (!Number.isFinite(numAmount) || numAmount <= 0) {
+          return res.status(400).json({ error: 'Amount must be a positive number' });
+        }
+
+        // Validate addresses
+        if (!Wallet.isValidAddress(from)) {
+          return res.status(400).json({ error: 'Invalid "from" address format' });
+        }
+        if (!Wallet.isValidAddress(to)) {
+          return res.status(400).json({ error: 'Invalid "to" address format' });
+        }
+
+        // Validate data size (max 256 bytes)
+        if (data && typeof data === 'string' && data.length > 256) {
+          return res.status(400).json({ error: 'Transaction data exceeds maximum size (256 bytes)' });
         }
 
         let tx: Transaction;
@@ -605,6 +664,9 @@ export class API {
           activity.totalRewardsEarned += earned;
         }
 
+        // Save activity to persistent storage
+        this.scheduleActivitySave();
+
         res.json({
           success: true,
           earnedNow: earned,
@@ -677,6 +739,9 @@ export class API {
 
           activity.totalRewardsEarned += bonus;
         }
+
+        // Save activity to persistent storage
+        this.scheduleActivitySave();
 
         res.json({
           streak: activity.streak.current,
@@ -756,6 +821,11 @@ export class API {
             break;
         }
 
+        // Save activity if completed
+        if (completed) {
+          this.scheduleActivitySave();
+        }
+
         res.json({
           success: true,
           action,
@@ -832,6 +902,9 @@ export class API {
 
         activity.totalRewardsEarned += reward;
 
+        // Save activity to persistent storage
+        this.scheduleActivitySave();
+
         res.json({
           success: true,
           missionId,
@@ -876,6 +949,9 @@ export class API {
         await this.storage.saveBlockchain(this.blockchain);
 
         activity.totalRewardsEarned += reward;
+
+        // Save activity to persistent storage
+        this.scheduleActivitySave();
 
         res.json({
           success: true,
@@ -993,6 +1069,9 @@ export class API {
             (activity as any).lastGuardianReward = now;
             activity.totalRewardsEarned += GUARDIAN_REWARD;
 
+            // Save activity to persistent storage
+            this.scheduleActivitySave();
+
             result.guardianReward = GUARDIAN_REWARD;
             result.message = 'Thank you for protecting the network!';
           } else {
@@ -1013,11 +1092,14 @@ export class API {
       try {
         const { backup, adminKey } = req.body;
 
-        // This is a sensitive operation - require admin key
-        // In production, this should be a secure key stored in env vars
-        const ADMIN_KEY = process.env.ADMIN_KEY || 'vibecoin-admin-2024';
+        // This is a sensitive operation - require admin key from environment
+        const ADMIN_KEY = process.env.ADMIN_KEY;
 
-        if (adminKey !== ADMIN_KEY) {
+        if (!ADMIN_KEY) {
+          return res.status(503).json({ error: 'Import disabled: ADMIN_KEY not configured on server' });
+        }
+
+        if (!adminKey || adminKey !== ADMIN_KEY) {
           return res.status(403).json({ error: 'Invalid admin key' });
         }
 

@@ -98,6 +98,9 @@ export class Node {
       await this.storage.saveBlockchain(this.blockchain);
     }
 
+    // Initialize API (load persisted user activities)
+    await this.api.init();
+
     // Start API
     await this.api.start();
 
