@@ -146,7 +146,7 @@ export class Node {
   }
 
   /**
-   * Start automatic mining
+   * Start automatic mining - only mines when there are pending transactions
    */
   startMining(address: string): void {
     if (this.miningInterval) {
@@ -154,10 +154,13 @@ export class Node {
     }
 
     console.log(`⛏️  Mining enabled for ${address.substring(0, 16)}...`);
+    console.log(`   Mode: Transaction-triggered (mines only when transactions are pending)`);
 
     this.miningInterval = setInterval(async () => {
-      if (this.blockchain.pendingTransactions.length > 0 || this.blockchain.chain.length < 5) {
-        console.log(`\n⛏️  Mining block ${this.blockchain.chain.length}...`);
+      // Only mine if there are pending transactions (real testnet behavior)
+      if (this.blockchain.pendingTransactions.length > 0) {
+        const pendingCount = this.blockchain.pendingTransactions.length;
+        console.log(`\n⛏️  Mining block ${this.blockchain.chain.length} (${pendingCount} pending tx)...`);
 
         const block = this.blockchain.minePendingTransactions(address);
 
@@ -170,9 +173,36 @@ export class Node {
         await this.storage.saveBlockchain(this.blockchain);
         this.p2p.broadcastBlock(block);
 
-        console.log(`✅ Block ${block.index} mined and broadcast`);
+        console.log(`✅ Block ${block.index} mined with ${block.transactions.length} transactions`);
       }
     }, this.config.mining.interval);
+  }
+
+  /**
+   * Mine a single block immediately (triggered by API or transaction)
+   */
+  async mineBlock(address: string): Promise<Block | null> {
+    if (this.blockchain.pendingTransactions.length === 0) {
+      console.log('⚠️  No pending transactions to mine');
+      return null;
+    }
+
+    const pendingCount = this.blockchain.pendingTransactions.length;
+    console.log(`\n⛏️  Mining block ${this.blockchain.chain.length} (${pendingCount} pending tx)...`);
+
+    const block = this.blockchain.minePendingTransactions(address);
+
+    // Index transactions
+    for (const tx of block.transactions) {
+      await this.storage.indexTransaction(tx, block.index);
+    }
+
+    // Save and broadcast
+    await this.storage.saveBlockchain(this.blockchain);
+    this.p2p.broadcastBlock(block);
+
+    console.log(`✅ Block ${block.index} mined with ${block.transactions.length} transactions`);
+    return block;
   }
 
   /**

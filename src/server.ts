@@ -53,7 +53,7 @@ const node = new Node({
   mining: {
     enabled: true,
     address: minerWallet.publicKey,
-    interval: 30000 // Mine every 30 seconds
+    interval: 10000 // Check for pending transactions every 10 seconds
   }
 });
 
