@@ -4,13 +4,19 @@
   "description": "VibeCoin - The cryptocurrency born from the VibeCoding movement",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "vibecoin": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "npm run build && node dist/index.js",
     "dev": "ts-node src/index.ts",
     "demo": "npm run build && node dist/index.js",
+    "node": "ts-node src/cli.ts",
+    "node:testnet": "ts-node src/cli.ts --network testnet --mine --miner new",
+    "node:local": "ts-node src/cli.ts --network local --mine --miner new",
     "test": "jest",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist data"
   },
   "keywords": [
     "blockchain",
@@ -19,7 +25,8 @@
     "vibecoding",
     "crypto",
     "web3",
-    "defi"
+    "defi",
+    "testnet"
   ],
   "author": "BLKSTUDIO",
   "license": "MIT",
@@ -32,11 +39,20 @@
   },
   "homepage": "https://github.com/IOSBLKSTUDIO/VibeCoin#readme",
   "dependencies": {
-    "elliptic": "^6.6.1"
+    "cors": "^2.8.5",
+    "elliptic": "^6.6.1",
+    "express": "^5.2.1",
+    "level": "^10.0.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/elliptic": "^6.4.18",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

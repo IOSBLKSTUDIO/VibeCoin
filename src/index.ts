@@ -3,10 +3,25 @@
  * The cryptocurrency born from the VibeCoding movement
  */
 
+// Core
 export { Block } from './core/Block';
 export { Transaction } from './core/Transaction';
 export { Blockchain, BLOCKCHAIN_CONFIG } from './core/Blockchain';
+
+// Wallet
 export { Wallet } from './wallet/Wallet';
+
+// Storage
+export { Storage, StorageConfig } from './storage/Storage';
+
+// API
+export { API, APIConfig } from './api/API';
+
+// Network
+export { P2PNetwork, P2PConfig } from './network/P2P';
+
+// Node
+export { Node, NodeConfig } from './node/Node';
 
 // Quick demo when running directly
 if (require.main === module) {
