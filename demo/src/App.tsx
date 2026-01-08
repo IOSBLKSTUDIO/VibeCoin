@@ -6,7 +6,7 @@ import { exportWalletToFile, importWalletFromFile } from './crypto';
 import { RewardsPanel } from './RewardsPanel';
 import './App.css';
 
-type View = 'chat' | 'explorer' | 'wallet' | 'whitepaper';
+type View = 'showcase' | 'chat' | 'explorer' | 'wallet' | 'whitepaper';
 
 // Storage keys
 const WALLET_STORAGE_KEY = 'vibecoin_wallet';
@@ -128,7 +128,7 @@ interface ChatMessage {
 }
 
 function App() {
-  const [currentView, setCurrentView] = useState<View>('chat');
+  const [currentView, setCurrentView] = useState<View>('showcase');
   const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(false);
@@ -962,76 +962,422 @@ function App() {
     </div>
   );
 
+  const renderShowcase = () => (
+    <div className="showcase">
+      {/* Hero Section */}
+      <section className="hero-section">
+        <div className="hero-bg-grid"></div>
+        <div className="hero-glow"></div>
+        <div className="hero-content">
+          <div className="hero-badge">
+            <span className="badge-dot"></span>
+            {language === 'fr' ? 'Testnet Actif' : 'Testnet Live'}
+          </div>
+          <h1 className="hero-title">
+            <span className="title-gradient">VibeCoin</span>
+            <span className="title-sub">{language === 'fr' ? 'La crypto née du VibeCoding' : 'The Crypto Born from VibeCoding'}</span>
+          </h1>
+          <p className="hero-description">
+            {language === 'fr'
+              ? 'Une blockchain nouvelle génération avec Proof of Vibe (PoV). Stakez, votez, gagnez des récompenses et participez à un écosystème décentralisé où la créativité et la communauté sont au coeur du consensus.'
+              : 'A next-generation blockchain with Proof of Vibe (PoV). Stake, vote, earn rewards, and participate in a decentralized ecosystem where creativity and community drive consensus.'}
+          </p>
+          <div className="hero-cta">
+            <button className="cta-primary" onClick={() => setCurrentView('chat')}>
+              <span className="cta-icon">⚡</span>
+              {language === 'fr' ? 'Lancer l\'App' : 'Launch App'}
+            </button>
+            <button className="cta-secondary" onClick={() => setCurrentView('whitepaper')}>
+              <span className="cta-icon">📄</span>
+              Whitepaper
+            </button>
+          </div>
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <span className="stat-number">{nodeInfo?.blocks || 0}</span>
+              <span className="stat-label">Blocks</span>
+            </div>
+            <div className="hero-stat-divider"></div>
+            <div className="hero-stat">
+              <span className="stat-number">{nodeInfo?.circulatingSupply?.toFixed(0) || 0}</span>
+              <span className="stat-label">VIBE {language === 'fr' ? 'Minés' : 'Minted'}</span>
+            </div>
+            <div className="hero-stat-divider"></div>
+            <div className="hero-stat">
+              <span className="stat-number">21M</span>
+              <span className="stat-label">Max Supply</span>
+            </div>
+            <div className="hero-stat-divider"></div>
+            <div className="hero-stat">
+              <span className="stat-number">~10s</span>
+              <span className="stat-label">Block Time</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="features-section">
+        <h2 className="section-title">
+          <span className="title-icon">🔮</span>
+          {language === 'fr' ? 'Architecture Technique' : 'Technical Architecture'}
+        </h2>
+        <div className="features-grid">
+          <div className="feature-card">
+            <div className="feature-icon-wrapper">
+              <span className="feature-icon">🛡️</span>
+            </div>
+            <h3>Proof of Vibe (PoV)</h3>
+            <p>{language === 'fr'
+              ? 'Consensus hybride combinant staking, votes communautaires et score de contribution pour une sécurité décentralisée.'
+              : 'Hybrid consensus combining staking, community votes, and contribution score for decentralized security.'}</p>
+            <div className="feature-code">
+              <code>VibeScore = (Stake × 0.4) + (Votes × 0.3) + (Contribution × 0.3)</code>
+            </div>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon-wrapper">
+              <span className="feature-icon">⛓️</span>
+            </div>
+            <h3>{language === 'fr' ? 'Blockchain Complète' : 'Full Blockchain'}</h3>
+            <p>{language === 'fr'
+              ? 'Implémentation from scratch : blocs, transactions signées ECDSA, mempool, P2P, API REST et stockage LevelDB.'
+              : 'Built from scratch: blocks, ECDSA-signed transactions, mempool, P2P network, REST API and LevelDB storage.'}</p>
+            <div className="feature-tech-stack">
+              <span className="tech-tag">TypeScript</span>
+              <span className="tech-tag">Node.js</span>
+              <span className="tech-tag">LevelDB</span>
+              <span className="tech-tag">WebSocket</span>
+            </div>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon-wrapper">
+              <span className="feature-icon">🎮</span>
+            </div>
+            <h3>{language === 'fr' ? 'Gamification On-Chain' : 'On-Chain Gamification'}</h3>
+            <p>{language === 'fr'
+              ? 'Système de missions, streaks quotidiens, récompenses VIBE et progression stockés directement sur la blockchain.'
+              : 'Mission system, daily streaks, VIBE rewards and progression stored directly on the blockchain.'}</p>
+            <div className="feature-rewards">
+              <span className="reward-item">🎯 Missions</span>
+              <span className="reward-item">🔥 Streaks</span>
+              <span className="reward-item">💎 Rewards</span>
+            </div>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon-wrapper">
+              <span className="feature-icon">🔐</span>
+            </div>
+            <h3>{language === 'fr' ? 'Sécurité Avancée' : 'Advanced Security'}</h3>
+            <p>{language === 'fr'
+              ? 'Signatures ECDSA secp256k1, validation des transactions, limite mempool anti-DoS, et système Guardian de backup.'
+              : 'ECDSA secp256k1 signatures, transaction validation, anti-DoS mempool limits, and Guardian backup system.'}</p>
+            <div className="feature-security">
+              <span className="security-badge">✓ ECDSA</span>
+              <span className="security-badge">✓ SHA-256</span>
+              <span className="security-badge">✓ Merkle</span>
+            </div>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon-wrapper">
+              <span className="feature-icon">💬</span>
+            </div>
+            <h3>VibeChat AI</h3>
+            <p>{language === 'fr'
+              ? 'Interface conversationnelle en langage naturel pour interagir avec la blockchain. Créez des wallets et envoyez des VIBE en parlant.'
+              : 'Natural language conversational interface to interact with the blockchain. Create wallets and send VIBE just by talking.'}</p>
+            <div className="feature-chat-demo">
+              <span className="chat-example">"Give me some VIBE"</span>
+              <span className="chat-arrow">→</span>
+              <span className="chat-result">+100 VIBE</span>
+            </div>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon-wrapper">
+              <span className="feature-icon">🌐</span>
+            </div>
+            <h3>{language === 'fr' ? 'Réseau P2P' : 'P2P Network'}</h3>
+            <p>{language === 'fr'
+              ? 'Architecture décentralisée avec synchronisation des blocs, broadcast des transactions et découverte automatique des pairs.'
+              : 'Decentralized architecture with block synchronization, transaction broadcast and automatic peer discovery.'}</p>
+            <div className="feature-network">
+              <div className="network-node active"></div>
+              <div className="network-line"></div>
+              <div className="network-node"></div>
+              <div className="network-line"></div>
+              <div className="network-node"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="how-section">
+        <h2 className="section-title">
+          <span className="title-icon">🚀</span>
+          {language === 'fr' ? 'Comment ça marche' : 'How It Works'}
+        </h2>
+        <div className="steps-container">
+          <div className="step-card">
+            <div className="step-number">01</div>
+            <h3>{language === 'fr' ? 'Créez votre Wallet' : 'Create your Wallet'}</h3>
+            <p>{language === 'fr'
+              ? 'Générez un wallet sécurisé avec phrase de récupération de 12 mots. 100% client-side.'
+              : 'Generate a secure wallet with 12-word recovery phrase. 100% client-side.'}</p>
+          </div>
+          <div className="step-connector">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div className="step-card">
+            <div className="step-number">02</div>
+            <h3>{language === 'fr' ? 'Obtenez des VIBE' : 'Get VIBE'}</h3>
+            <p>{language === 'fr'
+              ? 'Utilisez le faucet testnet pour recevoir des tokens gratuits et commencer à explorer.'
+              : 'Use the testnet faucet to receive free tokens and start exploring.'}</p>
+          </div>
+          <div className="step-connector">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div className="step-card">
+            <div className="step-number">03</div>
+            <h3>{language === 'fr' ? 'Gagnez des Récompenses' : 'Earn Rewards'}</h3>
+            <p>{language === 'fr'
+              ? 'Complétez des missions, maintenez votre streak et gagnez des VIBE supplémentaires.'
+              : 'Complete missions, maintain your streak and earn bonus VIBE.'}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Tech Specs Section */}
+      <section className="specs-section">
+        <h2 className="section-title">
+          <span className="title-icon">⚙️</span>
+          {language === 'fr' ? 'Spécifications' : 'Specifications'}
+        </h2>
+        <div className="specs-grid">
+          <div className="spec-item">
+            <span className="spec-key">Symbol</span>
+            <span className="spec-value">VIBE</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Max Supply</span>
+            <span className="spec-value">21,000,000</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Decimals</span>
+            <span className="spec-value">8</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Block Time</span>
+            <span className="spec-value">~10s</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Consensus</span>
+            <span className="spec-value">Proof of Vibe</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Cryptography</span>
+            <span className="spec-value">ECDSA secp256k1</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Hash</span>
+            <span className="spec-value">SHA-256</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Storage</span>
+            <span className="spec-value">LevelDB</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Network</span>
+            <span className="spec-value">WebSocket P2P</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">API</span>
+            <span className="spec-value">REST + JSON</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Max Validators</span>
+            <span className="spec-value">21</span>
+          </div>
+          <div className="spec-item">
+            <span className="spec-key">Min Stake</span>
+            <span className="spec-value">100 VIBE</span>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="final-cta-section">
+        <div className="cta-card">
+          <h2>{language === 'fr' ? 'Prêt à Vibe ?' : 'Ready to Vibe?'}</h2>
+          <p>{language === 'fr'
+            ? 'Rejoignez le testnet maintenant et soyez parmi les premiers à explorer VibeCoin.'
+            : 'Join the testnet now and be among the first to explore VibeCoin.'}</p>
+          <div className="cta-buttons">
+            <button className="cta-primary large" onClick={() => setCurrentView('chat')}>
+              <span className="cta-icon">🚀</span>
+              {language === 'fr' ? 'Commencer' : 'Get Started'}
+            </button>
+            <a href="https://github.com/IOSBLKSTUDIO/VibeCoin" target="_blank" rel="noopener noreferrer" className="cta-github">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              GitHub
+            </a>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
   const renderWhitepaper = () => (
     <section className="page-section">
       <div className="container">
         <article className="whitepaper-content">
           <h1>VibeCoin Whitepaper</h1>
-          <p className="subtitle">The Cryptocurrency Born from VibeCoding</p>
+          <p className="subtitle">{language === 'fr' ? 'La Crypto née du VibeCoding' : 'The Cryptocurrency Born from VibeCoding'}</p>
+          <p className="wp-version">v1.1.0 — January 2026</p>
 
           <section className="wp-section">
-            <h2>Abstract</h2>
+            <h2>{language === 'fr' ? 'Résumé' : 'Abstract'}</h2>
             <p>
-              VibeCoin (VIBE) represents a paradigm shift in cryptocurrency design,
-              embedding the philosophy of VibeCoding into its core architecture.
-              Unlike traditional cryptocurrencies that prioritize computational power
-              or capital accumulation, VibeCoin introduces "Proof of Vibe" (PoV) —
-              a novel consensus mechanism that rewards creativity, community contribution,
-              and sustainable development practices.
+              {language === 'fr'
+                ? 'VibeCoin (VIBE) représente un changement de paradigme dans la conception des cryptomonnaies, intégrant la philosophie du VibeCoding au cœur de son architecture. Contrairement aux cryptomonnaies traditionnelles qui privilégient la puissance de calcul ou l\'accumulation de capital, VibeCoin introduit le "Proof of Vibe" (PoV) — un mécanisme de consensus novateur qui récompense la créativité, la contribution communautaire et les pratiques de développement durables.'
+                : 'VibeCoin (VIBE) represents a paradigm shift in cryptocurrency design, embedding the philosophy of VibeCoding into its core architecture. Unlike traditional cryptocurrencies that prioritize computational power or capital accumulation, VibeCoin introduces "Proof of Vibe" (PoV) — a novel consensus mechanism that rewards creativity, community contribution, and sustainable development practices.'}
             </p>
           </section>
 
           <section className="wp-section">
-            <h2>The VibeCoding Philosophy</h2>
+            <h2>{language === 'fr' ? 'La Philosophie VibeCoding' : 'The VibeCoding Philosophy'}</h2>
             <p>
-              VibeCoding emerged as a counter-movement to the industrialization of software development.
-              It advocates for:
+              {language === 'fr'
+                ? 'Le VibeCoding a émergé comme un contre-mouvement à l\'industrialisation du développement logiciel. Il prône :'
+                : 'VibeCoding emerged as a counter-movement to the industrialization of software development. It advocates for:'}
             </p>
             <ul>
-              <li><strong>Flow Over Force:</strong> Writing code when inspiration strikes</li>
-              <li><strong>Intuition-Driven Development:</strong> Trusting developer instincts</li>
-              <li><strong>Creative Expression:</strong> Every line of code as art</li>
-              <li><strong>Community Harmony:</strong> Building together, growing together</li>
+              <li><strong>{language === 'fr' ? 'Le Flow plutôt que la Force' : 'Flow Over Force'}:</strong> {language === 'fr' ? 'Écrire du code quand l\'inspiration frappe' : 'Writing code when inspiration strikes'}</li>
+              <li><strong>{language === 'fr' ? 'Développement Intuitif' : 'Intuition-Driven Development'}:</strong> {language === 'fr' ? 'Faire confiance à l\'instinct du développeur' : 'Trusting developer instincts'}</li>
+              <li><strong>{language === 'fr' ? 'Expression Créative' : 'Creative Expression'}:</strong> {language === 'fr' ? 'Chaque ligne de code est une œuvre d\'art' : 'Every line of code as art'}</li>
+              <li><strong>{language === 'fr' ? 'Harmonie Communautaire' : 'Community Harmony'}:</strong> {language === 'fr' ? 'Construire ensemble, grandir ensemble' : 'Building together, growing together'}</li>
             </ul>
           </section>
 
           <section className="wp-section">
             <h2>Proof of Vibe (PoV)</h2>
             <p>
-              Our consensus mechanism combines elements of Proof of Stake (PoS),
-              Delegated Proof of Stake (DPoS), and a novel reputation system:
+              {language === 'fr'
+                ? 'Notre mécanisme de consensus combine des éléments de Proof of Stake (PoS), Delegated Proof of Stake (DPoS), et un système de réputation novateur :'
+                : 'Our consensus mechanism combines elements of Proof of Stake (PoS), Delegated Proof of Stake (DPoS), and a novel reputation system:'}
             </p>
             <div className="formula-box">
               <strong>VibeScore = (Stake × 0.4) + (Votes × 0.3) + (Contribution × 0.3)</strong>
             </div>
             <p>
-              Validators are selected based on their VibeScore, ensuring that
-              those who contribute most to the ecosystem have the greatest influence.
+              {language === 'fr'
+                ? 'Les validateurs sont sélectionnés en fonction de leur VibeScore, garantissant que ceux qui contribuent le plus à l\'écosystème ont la plus grande influence.'
+                : 'Validators are selected based on their VibeScore, ensuring that those who contribute most to the ecosystem have the greatest influence.'}
             </p>
           </section>
 
           <section className="wp-section">
-            <h2>Technical Specifications</h2>
+            <h2>{language === 'fr' ? 'Gamification On-Chain' : 'On-Chain Gamification'}</h2>
+            <p>
+              {language === 'fr'
+                ? 'VibeCoin intègre un système de gamification complet directement sur la blockchain, encourageant l\'engagement et la fidélité des utilisateurs :'
+                : 'VibeCoin integrates a complete gamification system directly on the blockchain, encouraging user engagement and loyalty:'}
+            </p>
+            <ul>
+              <li><strong>{language === 'fr' ? 'Système de Missions' : 'Mission System'}:</strong> {language === 'fr' ? 'Complétez des missions quotidiennes pour gagner des VIBE (vérifier le solde, explorer les blocs, utiliser le faucet, effectuer des transactions, partager sur les réseaux sociaux)' : 'Complete daily missions to earn VIBE (check balance, explore blocks, use faucet, make transactions, share on social media)'}</li>
+              <li><strong>{language === 'fr' ? 'Streaks Quotidiens' : 'Daily Streaks'}:</strong> {language === 'fr' ? 'Maintenez une série de connexions consécutives pour des bonus croissants (jusqu\'à +100% au jour 7)' : 'Maintain consecutive login streaks for increasing bonuses (up to +100% on day 7)'}</li>
+              <li><strong>{language === 'fr' ? 'Récompenses Persistantes' : 'Persistent Rewards'}:</strong> {language === 'fr' ? 'Toutes les données de progression sont stockées sur la blockchain via LevelDB' : 'All progression data is stored on the blockchain via LevelDB'}</li>
+            </ul>
+            <div className="formula-box">
+              <strong>{language === 'fr' ? 'Récompenses Streak' : 'Streak Rewards'}: Day 3 = +25% | Day 5 = +50% | Day 7 = +100%</strong>
+            </div>
+          </section>
+
+          <section className="wp-section">
+            <h2>{language === 'fr' ? 'Système Guardian' : 'Guardian System'}</h2>
+            <p>
+              {language === 'fr'
+                ? 'Pour assurer la résilience et la décentralisation du réseau, VibeCoin implémente un système de "Guardians" :'
+                : 'To ensure network resilience and decentralization, VibeCoin implements a "Guardians" system:'}
+            </p>
+            <ul>
+              <li><strong>{language === 'fr' ? 'Sauvegarde Blockchain' : 'Blockchain Backup'}:</strong> {language === 'fr' ? 'Les utilisateurs peuvent télécharger une copie complète de la blockchain' : 'Users can download a complete copy of the blockchain'}</li>
+              <li><strong>{language === 'fr' ? 'Vérification de Backup' : 'Backup Verification'}:</strong> {language === 'fr' ? 'Les backups sont vérifiés cryptographiquement pour garantir leur intégrité' : 'Backups are cryptographically verified to ensure integrity'}</li>
+              <li><strong>{language === 'fr' ? 'Récompenses Guardian' : 'Guardian Rewards'}:</strong> {language === 'fr' ? '50 VIBE toutes les 24h pour les utilisateurs qui maintiennent des backups valides' : '50 VIBE every 24h for users who maintain valid backups'}</li>
+              <li><strong>{language === 'fr' ? 'Récupération' : 'Recovery'}:</strong> {language === 'fr' ? 'En cas de défaillance, n\'importe quel Guardian peut restaurer le réseau' : 'In case of failure, any Guardian can restore the network'}</li>
+            </ul>
+          </section>
+
+          <section className="wp-section">
+            <h2>{language === 'fr' ? 'Architecture Sécurisée' : 'Secure Architecture'}</h2>
+            <p>
+              {language === 'fr'
+                ? 'VibeCoin implémente plusieurs couches de sécurité pour protéger le réseau et les utilisateurs :'
+                : 'VibeCoin implements multiple security layers to protect the network and users:'}
+            </p>
+            <ul>
+              <li><strong>ECDSA secp256k1:</strong> {language === 'fr' ? 'Signatures cryptographiques de niveau Bitcoin' : 'Bitcoin-grade cryptographic signatures'}</li>
+              <li><strong>SHA-256:</strong> {language === 'fr' ? 'Hachage des blocs et transactions' : 'Block and transaction hashing'}</li>
+              <li><strong>{language === 'fr' ? 'Validation des Transactions' : 'Transaction Validation'}:</strong> {language === 'fr' ? 'Vérification des montants, adresses et taille des données' : 'Amount, address, and data size verification'}</li>
+              <li><strong>{language === 'fr' ? 'Protection Anti-DoS' : 'Anti-DoS Protection'}:</strong> {language === 'fr' ? 'Limite de 1000 transactions en attente dans le mempool' : 'Limit of 1000 pending transactions in the mempool'}</li>
+              <li><strong>{language === 'fr' ? 'Clés Sécurisées' : 'Secure Keys'}:</strong> {language === 'fr' ? 'Clés admin via variables d\'environnement, jamais hardcodées' : 'Admin keys via environment variables, never hardcoded'}</li>
+            </ul>
+          </section>
+
+          <section className="wp-section">
+            <h2>{language === 'fr' ? 'Spécifications Techniques' : 'Technical Specifications'}</h2>
             <table className="specs-table">
               <tbody>
                 <tr><td>Symbol</td><td>{TOKEN.symbol}</td></tr>
                 <tr><td>Total Supply</td><td>{TOKEN.maxSupply.toLocaleString()}</td></tr>
-                <tr><td>Block Time</td><td>~10 seconds</td></tr>
+                <tr><td>Block Time</td><td>~10 {language === 'fr' ? 'secondes' : 'seconds'}</td></tr>
                 <tr><td>Consensus</td><td>Proof of Vibe (PoV)</td></tr>
                 <tr><td>Max Validators</td><td>21</td></tr>
                 <tr><td>Minimum Stake</td><td>100 VIBE</td></tr>
                 <tr><td>Decimals</td><td>{TOKEN.decimals}</td></tr>
+                <tr><td>Cryptography</td><td>ECDSA secp256k1 + SHA-256</td></tr>
+                <tr><td>Storage</td><td>LevelDB</td></tr>
+                <tr><td>Network</td><td>WebSocket P2P</td></tr>
+                <tr><td>API</td><td>REST + JSON</td></tr>
+                <tr><td>Max Mempool</td><td>1000 TX</td></tr>
               </tbody>
             </table>
           </section>
 
           <section className="wp-section">
+            <h2>VibeChat</h2>
+            <p>
+              {language === 'fr'
+                ? 'VibeCoin propose une interface conversationnelle unique permettant d\'interagir avec la blockchain en langage naturel :'
+                : 'VibeCoin offers a unique conversational interface allowing interaction with the blockchain in natural language:'}
+            </p>
+            <ul>
+              <li><strong>{language === 'fr' ? 'Création de Wallet' : 'Wallet Creation'}:</strong> "Create a wallet for me"</li>
+              <li><strong>{language === 'fr' ? 'Demande de Tokens' : 'Token Request'}:</strong> "Give me some VIBE"</li>
+              <li><strong>{language === 'fr' ? 'Transferts' : 'Transfers'}:</strong> "Send 50 VIBE to 04abc..."</li>
+              <li><strong>{language === 'fr' ? 'Exploration' : 'Exploration'}:</strong> "Show me the latest blocks"</li>
+              <li><strong>{language === 'fr' ? 'Multilingue' : 'Multilingual'}:</strong> {language === 'fr' ? 'Supporte l\'anglais et le français' : 'Supports English and French'}</li>
+            </ul>
+          </section>
+
+          <section className="wp-section">
             <h2>Conclusion</h2>
             <p>
-              VibeCoin is more than a cryptocurrency — it's a movement. By aligning
-              economic incentives with creative contribution and community building,
-              we create a sustainable ecosystem where developers, artists, and
-              educators can thrive.
+              {language === 'fr'
+                ? 'VibeCoin est plus qu\'une cryptomonnaie — c\'est un mouvement. En alignant les incitations économiques avec la contribution créative et la construction communautaire, nous créons un écosystème durable où développeurs, artistes et éducateurs peuvent s\'épanouir.'
+                : 'VibeCoin is more than a cryptocurrency — it\'s a movement. By aligning economic incentives with creative contribution and community building, we create a sustainable ecosystem where developers, artists, and educators can thrive.'}
             </p>
             <p className="quote">
               "Code with feeling. Build with passion. Create with vibes."
@@ -1067,6 +1413,12 @@ function App() {
 
           <nav className="nav">
             <button
+              className={`nav-link ${currentView === 'showcase' ? 'active' : ''}`}
+              onClick={() => setCurrentView('showcase')}
+            >
+              Home
+            </button>
+            <button
               className={`nav-link ${currentView === 'chat' ? 'active' : ''}`}
               onClick={() => setCurrentView('chat')}
             >
@@ -1101,8 +1453,9 @@ function App() {
         </div>
       </header>
 
-      <main className="main">
-        <div className="container">
+      <main className={`main ${currentView === 'showcase' ? 'showcase-main' : ''}`}>
+        <div className={currentView === 'showcase' ? 'showcase-container' : 'container'}>
+          {currentView === 'showcase' && renderShowcase()}
           {currentView === 'chat' && renderChat()}
           {currentView === 'explorer' && renderExplorer()}
           {currentView === 'whitepaper' && renderWhitepaper()}
