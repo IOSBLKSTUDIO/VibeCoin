@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 import type { NodeInfo, Block } from './api';
 import { API_URL, TOKEN, REFRESH_INTERVAL } from './config';
+import { exportWalletToFile, importWalletFromFile } from './crypto';
 import './App.css';
 
 type View = 'chat' | 'explorer' | 'wallet' | 'whitepaper';
@@ -51,7 +52,13 @@ What would you like to do?`,
     walletRestored: (publicKey: string) => `Wallet restored successfully!\n\nYour address:\n\`${publicKey.substring(0, 32)}...\`\n\n✅ You can now use your wallet. Ask me for your balance or some free testnet VIBE!`,
     walletRestoreFailed: `Invalid recovery phrase. Please make sure you entered all 12 words correctly, separated by spaces.`,
     walletRestoreInstructions: `To restore your wallet, type: "restore" followed by your 12-word recovery phrase.\n\nExample: "restore word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"`,
-    notUnderstood: `I didn't quite understand that. Try saying:\n• "Create a wallet"\n• "Give me some VIBE"\n• "What's my balance?"\n• "Show me the blocks"\n• "Restore my wallet"\n\nOr just say "help" for more options!`,
+    exportWalletPrompt: `To export your wallet, type: "export wallet" followed by a password to encrypt it.\n\nExample: "export wallet mySecurePassword123"\n\n⚠️ Remember this password - you'll need it to import the wallet!`,
+    exportWalletSuccess: `✅ Wallet exported successfully!\n\nA file has been downloaded to your device. Store it safely (USB, cloud storage, etc.).\n\n⚠️ Remember your password - you'll need it to import the wallet!`,
+    exportWalletFailed: `❌ Failed to export wallet. Please try again.`,
+    importWalletPrompt: `To import a wallet from a backup file:\n\n1. Click the "Import File" button below\n2. Select your wallet file (.json)\n3. Enter your password when prompted`,
+    importWalletSuccess: (publicKey: string) => `✅ Wallet imported successfully!\n\nYour address:\n\`${publicKey.substring(0, 32)}...\`\n\nYou can now use your wallet!`,
+    importWalletFailed: `❌ Failed to import wallet. Wrong password or corrupted file.`,
+    notUnderstood: `I didn't quite understand that. Try saying:\n• "Create a wallet"\n• "Give me some VIBE"\n• "What's my balance?"\n• "Show me the blocks"\n• "Restore my wallet"\n• "Export wallet" or "Import wallet"\n\nOr just say "help" for more options!`,
     error: `Something went wrong. Please try again.`,
     placeholder: `Type a message... (e.g., 'give me some VIBE')`,
     langChanged: `Language changed to English! How can I help you?`
@@ -92,7 +99,13 @@ Que souhaitez-vous faire ?`,
     walletRestored: (publicKey: string) => `Wallet restauré avec succès !\n\nVotre adresse :\n\`${publicKey.substring(0, 32)}...\`\n\n✅ Vous pouvez maintenant utiliser votre wallet. Demandez-moi votre solde ou des VIBE gratuits pour le testnet !`,
     walletRestoreFailed: `Phrase de récupération invalide. Assurez-vous d'avoir entré les 12 mots correctement, séparés par des espaces.`,
     walletRestoreInstructions: `Pour restaurer votre wallet, tapez : "restaurer" suivi de vos 12 mots de récupération.\n\nExemple : "restaurer mot1 mot2 mot3 mot4 mot5 mot6 mot7 mot8 mot9 mot10 mot11 mot12"`,
-    notUnderstood: `Je n'ai pas bien compris. Essayez de dire :\n• "Crée un wallet"\n• "Donne-moi des VIBE"\n• "Quel est mon solde ?"\n• "Montre les blocs"\n• "Restaurer mon wallet"\n\nOu dites "aide" pour plus d'options !`,
+    exportWalletPrompt: `Pour exporter votre wallet, tapez : "exporter wallet" suivi d'un mot de passe pour le chiffrer.\n\nExemple : "exporter wallet monMotDePasse123"\n\n⚠️ Retenez ce mot de passe - vous en aurez besoin pour importer le wallet !`,
+    exportWalletSuccess: `✅ Wallet exporté avec succès !\n\nUn fichier a été téléchargé sur votre appareil. Stockez-le en sécurité (clé USB, cloud, etc.).\n\n⚠️ Retenez votre mot de passe - vous en aurez besoin pour importer le wallet !`,
+    exportWalletFailed: `❌ Échec de l'export du wallet. Veuillez réessayer.`,
+    importWalletPrompt: `Pour importer un wallet depuis un fichier de sauvegarde :\n\n1. Cliquez sur le bouton "Importer un fichier" ci-dessous\n2. Sélectionnez votre fichier wallet (.json)\n3. Entrez votre mot de passe quand demandé`,
+    importWalletSuccess: (publicKey: string) => `✅ Wallet importé avec succès !\n\nVotre adresse :\n\`${publicKey.substring(0, 32)}...\`\n\nVous pouvez maintenant utiliser votre wallet !`,
+    importWalletFailed: `❌ Échec de l'import du wallet. Mauvais mot de passe ou fichier corrompu.`,
+    notUnderstood: `Je n'ai pas bien compris. Essayez de dire :\n• "Crée un wallet"\n• "Donne-moi des VIBE"\n• "Quel est mon solde ?"\n• "Montre les blocs"\n• "Restaurer mon wallet"\n• "Exporter wallet" ou "Importer wallet"\n\nOu dites "aide" pour plus d'options !`,
     error: `Une erreur s'est produite. Veuillez réessayer.`,
     placeholder: `Tapez un message... (ex: 'donne-moi des VIBE')`,
     langChanged: `Langue changée en français ! Comment puis-je vous aider ?`
@@ -130,6 +143,7 @@ function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Language state
   const [language, setLanguage] = useState<Language | null>(null);
@@ -319,8 +333,45 @@ function App() {
     }
 
     // Show restore instructions (EN + FR)
-    if (lowerInput.match(/^(restore|recover|import|restaurer|récupérer|importer)$/i)) {
+    if (lowerInput.match(/^(restore|recover|restaurer|récupérer)$/i)) {
       return t.walletRestoreInstructions;
+    }
+
+    // Export wallet with password (EN + FR)
+    if (lowerInput.match(/^(export|exporter|backup|sauvegarder)\s+(wallet|portefeuille)\s+(.+)/i)) {
+      if (!wallet) {
+        return t.noWallet;
+      }
+
+      const match = input.match(/^(?:export|exporter|backup|sauvegarder)\s+(?:wallet|portefeuille)\s+(.+)/i);
+      if (match) {
+        const password = match[1].trim();
+        if (password.length < 6) {
+          return language === 'fr'
+            ? '⚠️ Le mot de passe doit contenir au moins 6 caractères.'
+            : '⚠️ Password must be at least 6 characters.';
+        }
+
+        try {
+          await exportWalletToFile(wallet, password);
+          return t.exportWalletSuccess;
+        } catch (error) {
+          return t.exportWalletFailed;
+        }
+      }
+    }
+
+    // Show export instructions (EN + FR)
+    if (lowerInput.match(/^(export|exporter|backup|sauvegarder)(\s+(wallet|portefeuille))?$/i)) {
+      if (!wallet) {
+        return t.noWallet;
+      }
+      return t.exportWalletPrompt;
+    }
+
+    // Show import instructions (EN + FR)
+    if (lowerInput.match(/^(import|importer)(\s+(wallet|portefeuille|file|fichier))?$/i)) {
+      return t.importWalletPrompt;
     }
 
     // Get faucet / request tokens (EN + FR)
@@ -466,6 +517,37 @@ function App() {
     return t.notUnderstood;
   };
 
+  // Handle file import
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const password = prompt(language === 'fr'
+      ? 'Entrez le mot de passe pour déchiffrer le wallet :'
+      : 'Enter the password to decrypt the wallet:');
+
+    if (!password) {
+      addMessage('system', language === 'fr' ? 'Import annulé.' : 'Import cancelled.');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const walletData = await importWalletFromFile(file, password) as StoredWallet;
+      setWallet(walletData);
+      localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(walletData));
+      addMessage('system', t.importWalletSuccess(walletData.publicKey));
+    } catch (error) {
+      addMessage('system', t.importWalletFailed);
+    }
+    setIsProcessing(false);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Handle chat submit
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -588,6 +670,26 @@ function App() {
         </div>
 
         <form className="chat-input-form" onSubmit={handleChatSubmit}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".json"
+            onChange={handleFileImport}
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            className="import-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
+            title={language === 'fr' ? 'Importer un wallet' : 'Import wallet'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </button>
           <input
             type="text"
             value={chatInput}
